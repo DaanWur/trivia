@@ -1,7 +1,8 @@
 {
   "type": "module",
   "devDependencies": {
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "esbuild": "^0.19.14"
   },
   "dependencies": {
     "uuid": "^13.0.0"
