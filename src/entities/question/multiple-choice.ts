@@ -1,5 +1,5 @@
-import type Answer from "../../types/multiple-choice-asnwer.js";
-import { Question } from "./question.js";
+import type Answer from "../../types/multiple-choice-asnwer.ts";
+import { Question } from "./question.ts";
 
 export class MultipleChoice extends Question {
   options: Map<number, Answer>;

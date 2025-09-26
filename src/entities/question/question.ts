@@ -11,12 +11,14 @@ export class Question {
   answeredBy?: ID | null;
   points: number;
   createdAt: string;
+  difficulty: "easy" | "medium" | "hard" | undefined;
 
   constructor(
     text: string,
     categoryName: string,
     type: "multiple-choice" | "true-false",
-    points = 0
+    points = 0,
+    difficulty?: "easy" | "medium" | "hard"
   ) {
     this.id = uuidv4();
     this.text = text;
@@ -24,6 +26,7 @@ export class Question {
     this.type = type;
     this.points = points;
     this.createdAt = new Date().toISOString();
+    this.difficulty = difficulty;
     this.assignedTo = null;
     this.answeredBy = null;
   }
