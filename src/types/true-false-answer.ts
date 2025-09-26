@@ -1,3 +1,3 @@
 export default interface TrueFalseAnswer {
-  isTrue: boolean;
+    isTrue: boolean;
 }

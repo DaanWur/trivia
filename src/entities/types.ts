@@ -2,4 +2,4 @@
 
 export type ID = string;
 
-export type MatchStatus = "waiting" | "in-progress" | "finished";
+export type MatchStatus = 'waiting' | 'in-progress' | 'finished';

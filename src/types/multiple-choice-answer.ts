@@ -1,4 +1,4 @@
 export default interface Answer {
-  text: string;
-  isCorrect: boolean;
+    text: string;
+    isCorrect: boolean;
 }
