@@ -78,7 +78,7 @@ export class Match {
       throw new InvalidOperationError(
         "Cannot add more rounds than numberOfRounds"
       );
-    if (this.rounds.includes(round))
+    if (this.rounds.some((r) => r.id === round.id))
       throw new DuplicateError(
         `round ${round.id} already added to match ${this.id}`
       );
@@ -91,35 +91,47 @@ export class Match {
       this.leadingPlayer = null;
       return;
     }
-    if (!this.players.includes(player))
+    if (!this.hasPlayer(player.id))
       throw new NotFoundError(
         `player ${player.id} not part of match ${this.id}`
       );
     this.leadingPlayer = player;
   }
 
-  setWinner(player: Player) {
-    if (player.id === null) {
+  setWinner(player: Player | null) {
+    if (player === null) {
       this.winner = null;
       return;
     }
-    if (!this.players.includes(player))
+    if (!this.hasPlayer(player.id))
       throw new NotFoundError(
         `player ${player.id} not part of match ${this.id}`
       );
     this.winner = player;
-    if (player.id !== null) this.status = "finished";
+    this.status = "finished";
   }
 
   toJSON() {
     return {
       id: this.id,
-      players: this.players,
+      players: this.players.map((p) =>
+        typeof p.toJSON === "function" ? p.toJSON() : { id: p.id }
+      ),
       numberOfRounds: this.numberOfRounds,
-      rounds: this.rounds,
-      leadingPlayer: this.leadingPlayer,
+      rounds: this.rounds.map((r) =>
+        typeof r.toJSON === "function" ? r.toJSON() : { id: r.id }
+      ),
+      leadingPlayer: this.leadingPlayer
+        ? typeof this.leadingPlayer.toJSON === "function"
+          ? this.leadingPlayer.toJSON()
+          : { id: this.leadingPlayer.id }
+        : null,
       roundsLeft: this.roundsLeft,
-      winner: this.winner,
+      winner: this.winner
+        ? typeof this.winner.toJSON === "function"
+          ? this.winner.toJSON()
+          : { id: this.winner.id }
+        : null,
       status: this.status,
       createdAt: this.createdAt,
     };
