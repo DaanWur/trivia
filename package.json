@@ -1,0 +1,9 @@
+{
+  "type": "module",
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "uuid": "^13.0.0"
+  }
+}
