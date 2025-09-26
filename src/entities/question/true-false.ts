@@ -15,7 +15,7 @@ export class TrueFalse extends Question {
     labelTrue: string = "True",
     labelFalse: string = "False"
   ) {
-    super(text, categoryName, "true-false", points);
+    super(text, categoryName, "boolean", points);
     this.correctAnswer = correctAnswer;
     this.labelTrue = labelTrue;
     this.labelFalse = labelFalse;

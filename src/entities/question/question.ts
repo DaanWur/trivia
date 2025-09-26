@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from "uuid";
 
 export class Question {
   id: ID;
-  type: "multiple-choice" | "true-false";
+  type: "multiple" | "boolean";
   text: string;
   categoryName: string;
   assignedTo?: ID | null;
@@ -16,7 +16,7 @@ export class Question {
   constructor(
     text: string,
     categoryName: string,
-    type: "multiple-choice" | "true-false",
+    type: "multiple" | "boolean",
     points = 0,
     difficulty?: "easy" | "medium" | "hard"
   ) {

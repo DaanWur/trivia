@@ -1,7 +1,7 @@
 import axios from "axios";
 import * as fs from "fs";
 
-export default class GetQuestionsFromApiService {
+export default class QuestionService {
   private apiUrl: string = "https://opentdb.com/api.php";
 
   async getQuestionsFromApi(

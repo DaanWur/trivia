@@ -5,5 +5,4 @@ export * from "./category.ts";
 export * from "./question/question.ts";
 export * from "./question/multiple-choice.ts";
 export * from "./question/true-false.ts";
-export * from "./round.ts";
 export * from "./match.ts";
