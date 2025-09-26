@@ -2,7 +2,8 @@ import type { ID, MatchStatus } from "./types.js";
 import { NotFoundError } from "./Errors/errors.js";
 import { v4 as uuidv4 } from "uuid";
 import type { Player } from "./player.ts";
-import type { Question } from "./question/question.ts";
+import type { MultipleChoice } from "./question/multiple-choice.ts";
+import type { BooleanQuestion } from "./question/true-false.ts";
 
 export class Match {
   id: ID;
@@ -13,7 +14,8 @@ export class Match {
   winner?: Player | null;
   status: MatchStatus;
   createdAt: string;
-  questionPool: Map<ID, Question>;
+  questionPool: Map<ID, MultipleChoice | BooleanQuestion>;
+  // playerId -> questionId (or null if none assigned)
   assigned: Record<ID, ID | null>;
 
   constructor(players: Player[] = [], numberOfRounds = 1) {
@@ -65,9 +67,7 @@ export class Match {
         typeof p.toJSON === "function" ? p.toJSON() : { id: p.id }
       ),
       numberOfRounds: this.numberOfRounds,
-      rounds: this.rounds.map((r) =>
-        typeof r.toJSON === "function" ? r.toJSON() : { id: r.id }
-      ),
+
       leadingPlayer: this.leadingPlayer
         ? typeof this.leadingPlayer.toJSON === "function"
           ? this.leadingPlayer.toJSON()

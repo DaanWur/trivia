@@ -3,8 +3,17 @@ import {
   InvalidOperationError,
   DuplicateError,
 } from "../entities/Errors/errors.ts";
-import { Match, Player, Question, type ID } from "../entities/index.ts";
+import {
+  BooleanQuestion,
+  Match,
+  MultipleChoice,
+  Player,
+  Question,
+  type ID,
+} from "../entities/index.ts";
 import type { ApiQuestion } from "../types/api-question.ts";
+import type Answer from "../types/multiple-choice-answer.ts";
+import { decodeHTML } from "entities";
 
 export default class MatchService {
   constructor(private match: Match) {}
@@ -16,15 +25,62 @@ export default class MatchService {
    */
   createQuestionPool(questions: ApiQuestion[]) {
     for (const questionData of questions) {
-      const newQuestion = new Question(
-        questionData.question,
-        questionData.category,
-        questionData.type,
-        1,
-        questionData.difficulty
-      );
+      let newQuestion: Question | undefined;
+      if (questionData.type === "multiple") {
+        const answers: Array<Answer> = this.createAnswers(questionData).map(
+          (a) => ({ text: decodeHTML(a.text), isCorrect: a.isCorrect })
+        );
+        // simple shuffle
+        const options = this.shuffleAnswers(answers);
+
+        newQuestion = new MultipleChoice(
+          decodeHTML(questionData.question),
+          decodeHTML(questionData.category),
+          1,
+          options,
+          questionData.difficulty
+        );
+      } else if (questionData.type === "boolean") {
+        const correct =
+          decodeHTML(questionData.correct_answer) === "True" ||
+          decodeHTML(questionData.correct_answer) === "true";
+        newQuestion = new BooleanQuestion(
+          decodeHTML(questionData.question),
+          decodeHTML(questionData.category),
+          correct,
+          1,
+          "True",
+          "False",
+          questionData.difficulty
+        );
+      }
+      if (!newQuestion) continue;
+
       this.match.questionPool.set(newQuestion.id, newQuestion);
+      this.match.numberOfRounds = questions.length / 2;
     }
+  }
+
+  private shuffleAnswers(answers: Answer[]): Map<number, Answer> {
+    for (let i = answers.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = answers[i]!;
+      answers[i] = answers[j]!;
+      answers[j] = tmp;
+    }
+    const options = new Map<number, Answer>();
+    answers.forEach((a, idx) => options.set(idx + 1, a));
+    return options;
+  }
+
+  private createAnswers(questionData: ApiQuestion): Answer[] {
+    return [
+      { text: questionData.correct_answer, isCorrect: true },
+      ...questionData.incorrect_answers.map((t) => ({
+        text: t,
+        isCorrect: false,
+      })),
+    ];
   }
 
   /**

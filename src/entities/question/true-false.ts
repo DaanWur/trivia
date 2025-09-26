@@ -1,6 +1,6 @@
 import { Question } from "./question.js";
 
-export class TrueFalse extends Question {
+export class BooleanQuestion extends Question {
   // the canonical correct answer for this question
   correctAnswer: boolean;
   // optional labels for the boolean choices
@@ -13,9 +13,10 @@ export class TrueFalse extends Question {
     correctAnswer: boolean,
     points = 0,
     labelTrue: string = "True",
-    labelFalse: string = "False"
+    labelFalse: string = "False",
+    difficulty?: "easy" | "medium" | "hard"
   ) {
-    super(text, categoryName, "boolean", points);
+    super(text, categoryName, "boolean", points, difficulty);
     this.correctAnswer = correctAnswer;
     this.labelTrue = labelTrue;
     this.labelFalse = labelFalse;
