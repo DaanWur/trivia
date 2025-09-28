@@ -12,11 +12,16 @@ import {
     type ID
 } from '../entities/index.ts';
 import type { ApiQuestion } from '../types/api-question.ts';
+import type { ChosenAnswer } from '../types/chosen-answer.ts';
 import type Answer from '../types/multiple-choice-answer.ts';
 import { decodeHTML } from 'entities';
 
 export default class MatchService {
     constructor(private match: Match) {}
+
+    public initialize(match: Match) {
+        this.match = match;
+    }
 
     /**
      * Populate the match's question pool from API question data.
@@ -178,15 +183,96 @@ export default class MatchService {
     }
 
     /**
+     * Handles the logic for a player's turn, including answering, skipping, or passing.
+     * This is a non-UI method to keep the logic separate from the presentation.
+     * @param playerId The ID of the player whose turn it is.
+     * @param answer The answer provided by the player.
+     * @param q The question that was answered.
+     * @returns An object indicating the outcome of the turn.
+     */
+    handlePlayerAnswer(
+        playerId: ID,
+        answer: ChosenAnswer,
+        q: Question
+    ): {
+        nextPlayerId?: ID;
+        pointsAwarded: number;
+        questionPassed: boolean;
+        skipsRemaining: number;
+        turnOver: boolean;
+    } {
+        const player = this.match.players.find((p) => p.id === playerId);
+        if (!player) {
+            throw new NotFoundError(`Player with ID ${playerId} not found.`);
+        }
+
+        // 1. Handle Skip Attempt
+        if (answer.choice === undefined) {
+            if (player.skips > 0) {
+                player.skips--;
+                this.recordAnswer(playerId, false, q); // Consume the question
+                return {
+                    pointsAwarded: 0,
+                    questionPassed: false,
+                    skipsRemaining: player.skips,
+                    turnOver: false // Turn is NOT over, player gets a new question
+                };
+            }
+        }
+
+        // 2. Handle Correct Answer
+        if (answer.correct) {
+            const points = this.recordAnswer(playerId, true, q);
+            return {
+                pointsAwarded: points,
+                questionPassed: false,
+                skipsRemaining: player.skips,
+                turnOver: true
+            };
+        }
+
+        // 3. Handle Incorrect Answer (or skip with no skips left)
+        const currentPlayerIndex = this.match.players.findIndex(
+            (p) => p.id === playerId
+        );
+        const nextPlayer =
+            this.match.players[
+                (currentPlayerIndex + 1) % this.match.players.length
+            ];
+
+        if (nextPlayer && nextPlayer.id !== playerId) {
+            this.passQuestion(playerId, nextPlayer.id);
+            return {
+                nextPlayerId: nextPlayer.id,
+                pointsAwarded: 0,
+                questionPassed: true,
+                skipsRemaining: player.skips,
+                turnOver: false // The "turn" continues with the next player on the same question
+            };
+        }
+
+        // If no other player to pass to, the turn is over for this question.
+        this.recordAnswer(playerId, false, q);
+        return {
+            pointsAwarded: 0,
+            questionPassed: false,
+            skipsRemaining: player.skips,
+            turnOver: true
+        };
+    }
+
+    /**
      * Record an answer for a player. If a Question instance is provided use it
      * to compute points; otherwise attempt to resolve via the match.assigned map.
      * Returns the number of points awarded.
      */
     recordAnswer(playerId: ID, correct: boolean, question?: Question): number {
-        if (!this.match.hasPlayer(playerId))
+        const player = this.match.players.find((p) => p.id === playerId);
+        if (!player) {
             throw new NotFoundError(
                 `player ${playerId} not part of match ${this.match.id}`
             );
+        }
 
         let q: Question | undefined = question;
         if (!q) {
@@ -198,7 +284,14 @@ export default class MatchService {
             q = this.match.questionPool.get(qid) ?? undefined;
         }
 
+        if (q) {
+            this.match.questionPool.delete(q.id);
+        }
+
         const awarded = correct && q ? q.points : 0;
+        if (awarded > 0) {
+            player.addPoints(awarded);
+        }
 
         // clear assignment
         this.match.assigned[playerId] = null;
@@ -222,7 +315,6 @@ export default class MatchService {
         const next = it.next();
         if (next.done) return undefined;
         const q = next.value;
-        this.match.questionPool.delete(q.id);
         return q;
     }
 
