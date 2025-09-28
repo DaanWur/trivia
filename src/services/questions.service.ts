@@ -11,21 +11,26 @@ export default class QuestionService {
         difficulty?: string,
         type?: 'multiple' | 'boolean'
     ) {
-        const url = new URL(this.apiUrl);
-        url.searchParams.append('amount', amountToFetch.toString());
-        if (difficulty) {
-            url.searchParams.append('difficulty', difficulty);
-        }
-        if (type) {
-            url.searchParams.append('type', type);
-        }
+        try {
+            const url = new URL(this.apiUrl);
+            url.searchParams.append('amount', amountToFetch.toString());
+            if (difficulty) {
+                url.searchParams.append('difficulty', difficulty);
+            }
+            if (type) {
+                url.searchParams.append('type', type);
+            }
 
-        const res = await axios.get(url.toString());
-        if (res.status !== 200) {
-            throw new Error('Failed to fetch questions');
+            const res = await axios.get(url.toString());
+            if (res.status !== 200) {
+                throw new Error('Failed to fetch questions');
+            }
+            const data = await res.data;
+            return data.results;
+        } catch (error) {
+            console.error('Error fetching questions from API:', error);
+            throw new NotFoundError('Failed to fetch questions');
         }
-        const data = await res.data;
-        return data.results;
     }
 
     async readQuestionsFromJson(filePath: string) {

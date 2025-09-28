@@ -71,7 +71,7 @@ class MainRunner {
             if (this.matchService)
                 this.matchService.createQuestionPool(questions);
         } catch (error) {
-            console.error('Error fetching questions from API:', error);
+            console.error(error);
         }
     };
 
