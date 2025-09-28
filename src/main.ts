@@ -51,7 +51,11 @@ class MainRunner {
         }
     };
 
-    private createQuestionPool = async (numberOfQuestions: number) => {
+    private createQuestionPool = async (
+        isUrl: boolean,
+        filePath: string = 'data/questions-sample.json',
+        numberOfQuestions: number = 10
+    ) => {
         if (isNaN(numberOfQuestions) || numberOfQuestions <= 0) {
             console.log('Invalid number, please enter a positive integer.');
             return;
@@ -59,8 +63,11 @@ class MainRunner {
         try {
             const totalQuestions =
                 numberOfQuestions * this.match.players.length;
-            const questions =
-                await this.questionService.getQuestionsFromApi(totalQuestions);
+
+            const questions = isUrl
+                ? await this.questionService.getQuestionsFromApi(totalQuestions)
+                : await this.questionService.readQuestionsFromJson(filePath);
+
             if (this.matchService)
                 this.matchService.createQuestionPool(questions);
         } catch (error) {
@@ -103,60 +110,6 @@ class MainRunner {
         // add 4 more questions to support skips
         num += 4;
         return Math.floor(num / this.match.players.length);
-    }
-
-    public async run() {
-        // Initial greeting
-        await this.initilizeMatch();
-
-        // start game loop
-        while (this.match.status === 'in-progress') {
-            const currentPlayer = this.match.getCurrentPlayer();
-            if (!currentPlayer) {
-                console.log('Error: No current player set. Ending game.');
-                this.match.status = 'finished';
-                break;
-            }
-
-            // Increment round only when drawing a new question (not on first turn)
-            const assignedQuestionId = this.match.assigned[currentPlayer.id];
-            if (!assignedQuestionId && !this.firstTurn) {
-                this.match.currentRound++;
-            }
-
-            console.log(`\n-------- Round ${this.match.currentRound} --------`);
-            console.log(`${currentPlayer.name}'s turn.`);
-
-            let question: Question | undefined;
-            if (assignedQuestionId) {
-                question = this.match.questionPool.get(assignedQuestionId);
-            } else {
-                question = this.matchService.assignQuestionToPlayer(
-                    currentPlayer.id
-                );
-            }
-
-            if (!question) {
-                console.log('No more questions available. Ending game.');
-                this.match.status = 'finished';
-                break;
-            }
-
-            if (question.type === 'multiple') {
-                await this.multipleQuestionFlow(question, currentPlayer);
-            } else if (question.type === 'boolean') {
-                await this.booleanQuestionFlow(question, currentPlayer);
-            }
-
-            this.matchCareTaker.backup();
-
-            // Clear firstTurn flag after the first iteration
-            if (this.firstTurn) this.firstTurn = false;
-        }
-
-        console.log('\nGame over!');
-        // Determine and announce winner
-        // ...
     }
 
     private async booleanQuestionFlow(
@@ -302,11 +255,12 @@ class MainRunner {
             );
             const actualNumber = this.calculateRounds(num);
             this.match.numberOfRounds = actualNumber;
-            await this.createQuestionPool(actualNumber);
+            await this.createQuestionPool(this.isUrl, '', actualNumber);
         } else {
             const filePath = await this.ask(
                 'Please enter the file path to load questions from: '
             );
+            await this.createQuestionPool(this.isUrl, filePath);
         }
         // create players
         const [firstPlayer, secondPlayer] = await this.createPlayers();
@@ -315,6 +269,60 @@ class MainRunner {
         this.match.setCurrentPlayer(firstPlayer);
         this.matchService.start();
         this.matchCareTaker.backup();
+    }
+
+    public async run() {
+        // Initial greeting
+        await this.initilizeMatch();
+
+        // start game loop
+        while (this.match.status === 'in-progress') {
+            const currentPlayer = this.match.getCurrentPlayer();
+            if (!currentPlayer) {
+                console.log('Error: No current player set. Ending game.');
+                this.match.status = 'finished';
+                break;
+            }
+
+            // Increment round only when drawing a new question (not on first turn)
+            const assignedQuestionId = this.match.assigned[currentPlayer.id];
+            if (!assignedQuestionId && !this.firstTurn) {
+                this.match.currentRound++;
+            }
+
+            console.log(`\n-------- Round ${this.match.currentRound} --------`);
+            console.log(`${currentPlayer.name}'s turn.`);
+
+            let question: Question | undefined;
+            if (assignedQuestionId) {
+                question = this.match.questionPool.get(assignedQuestionId);
+            } else {
+                question = this.matchService.assignQuestionToPlayer(
+                    currentPlayer.id
+                );
+            }
+
+            if (!question) {
+                console.log('No more questions available. Ending game.');
+                this.match.status = 'finished';
+                break;
+            }
+
+            if (question.type === 'multiple') {
+                await this.multipleQuestionFlow(question, currentPlayer);
+            } else if (question.type === 'boolean') {
+                await this.booleanQuestionFlow(question, currentPlayer);
+            }
+
+            this.matchCareTaker.backup();
+
+            // Clear firstTurn flag after the first iteration
+            if (this.firstTurn) this.firstTurn = false;
+        }
+
+        console.log('\nGame over!');
+        // Determine and announce winner
+        // ...
     }
 }
 
