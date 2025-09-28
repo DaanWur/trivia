@@ -20,6 +20,7 @@ class MainRunner {
     private match: Match;
     private matchService: MatchService;
     private questionService: QuestionService;
+    private scores: Map<string, number> = new Map();
     private isUrl = false;
     private isexit = false;
 
@@ -96,8 +97,13 @@ class MainRunner {
         }
         while (true) {
             const ans = (
-                await this.ask('Your answer (enter option number): ')
+                await this.ask(
+                    "Your answer (enter option number, or 's' to skip): "
+                )
             ).trim();
+            if (ans.toLowerCase() === 's') {
+                return { correct: false, choice: undefined };
+            }
             const choice = parseInt(ans, 10);
             if (Number.isNaN(choice)) continue;
             if (!q.options.has(choice)) continue;
@@ -116,7 +122,12 @@ class MainRunner {
         console.log(`2: ${q.labelFalse}`);
         // re-prompt until valid 1 or 2 entered
         while (true) {
-            const ans = (await this.ask('Your answer (1 or 2): ')).trim();
+            const ans = (
+                await this.ask("Your answer (1 or 2, or 's' to skip): ")
+            ).trim();
+            if (ans.toLowerCase() === 's') {
+                return { correct: false, choice: undefined };
+            }
             const choice = parseInt(ans, 10);
             if (choice !== 1 && choice !== 2) continue;
             const picked = choice === 1;
@@ -134,22 +145,126 @@ class MainRunner {
         return await this.presentBooleanQuestion(q as BooleanQuestion);
     }
 
-    /**
-     * Iterate over a question iterable and present each question to the user.
-     * The handler receives the question and the result object to perform
-     * custom side-effects (scoring, persistence, etc.).
-     */
-    private async playQuestionPool<T extends IterableIterator<[any, Question]>>(
-        iter: T,
-        handler: (q: Question, result: ChosenAnswer) => Promise<void> | void
-    ) {
-        let counter = 0;
-        for (const [, q] of iter) {
-            counter++;
-            console.log(`\n--- Round ${counter} ---`);
-            const result = await this.presentQuestion(q);
-            await handler(q, result);
+    // present a question to a specific player and return the chosen answer
+    private async presentToPlayer(player: Player, q: Question) {
+        console.log(`\n${player.name}, it's your turn:`);
+        return await this.presentQuestion(q);
+    }
+
+    private async skipQuestion(player: Player) {
+        const q = this.matchService.skipQuestion(player.id);
+        if (!q) {
+            console.log(`No more questions available for ${player.name}`);
+            return;
         }
+        console.log('New question!');
+        await this.presentQuestion(q);
+    }
+
+    // award points via matchService.recordAnswer and update local scores map
+    private awardAndLog(player: Player, correct: boolean, q: Question) {
+        const awarded = this.matchService.recordAnswer(player.id, correct, q);
+        const prev = this.scores.get(player.id) ?? 0;
+        this.scores.set(player.id, prev + awarded);
+        console.log(
+            `${player.name} ${correct ? 'correct' : 'incorrect'} (+${awarded}) -> ${this.scores.get(player.id)}`
+        );
+    }
+
+    private async handleTurns() {
+        if (!this.matchService || !this.match) {
+            console.log('Match not initialized.');
+            return;
+        }
+
+        const players = this.match.players;
+        if (players.length === 0) {
+            console.log('No players to play the match.');
+            return;
+        }
+
+        let currentPlayerIndex = 0;
+        while (this.match.questionPool.size > 0) {
+            const player = players[currentPlayerIndex];
+            if (!player) {
+                currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
+                continue;
+            }
+
+            const q = this.matchService.assignQuestionToPlayer(player.id);
+            if (!q) {
+                console.log(`No more questions available.`);
+                break; // Exit if no questions are left
+            }
+            const answer = await this.presentToPlayer(player, q);
+
+            if (answer.choice === undefined) {
+                // Player wants to skip
+                if (player.skips > 0) {
+                    player.skips--;
+                    console.log(
+                        `${player.name} skipped the question. ${player.skips} skips remaining.`
+                    );
+                    this.matchService.recordAnswer(player.id, false, q); // Consume the question
+                    continue; // Same player's turn with a new question
+                } else {
+                    console.log(
+                        `${player.name} has no skips left. The question is considered incorrect.`
+                    );
+                    // Fall through to incorrect answer logic
+                }
+            }
+
+            if (answer.correct) {
+                this.awardAndLog(player, true, q);
+                currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
+            } else {
+                // Player answered incorrectly or tried to skip with no skips left
+                console.log(
+                    'Incorrect. The question will be passed to the next player.'
+                );
+                const nextPlayerIndex =
+                    (currentPlayerIndex + 1) % players.length;
+                const nextPlayer = players[nextPlayerIndex];
+
+                if (nextPlayer && nextPlayer.id !== player.id) {
+                    try {
+                        this.matchService.passQuestion(
+                            player.id,
+                            nextPlayer.id
+                        );
+                        const secondAnswer = await this.presentToPlayer(
+                            nextPlayer,
+                            q
+                        );
+                        if (
+                            secondAnswer.choice !== undefined &&
+                            secondAnswer.correct
+                        ) {
+                            this.awardAndLog(nextPlayer, true, q);
+                        } else {
+                            console.log(
+                                'Incorrect. No points awarded for this question.'
+                            );
+                            this.matchService.recordAnswer(
+                                nextPlayer.id,
+                                false,
+                                q
+                            );
+                        }
+                    } catch (e) {
+                        this.matchService.recordAnswer(player.id, false, q);
+                    }
+                } else {
+                    this.matchService.recordAnswer(player.id, false, q);
+                }
+                currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
+            }
+        }
+        // summary
+        console.log('\nFinal scores:');
+        for (const p of players)
+            console.log(`${p.name}: ${this.scores.get(p.id)}`);
     }
 
     async run() {
@@ -178,40 +293,8 @@ class MainRunner {
                 );
                 this.addPlayer(second);
 
-                // Play through the question pool using a reusable helper
-                const players = this.match.players;
-                if (players.length === 0) {
-                    console.log('No players to play the match.');
-                } else {
-                    let currentPlayerIndex = 0;
-                    await this.playQuestionPool(
-                        this.match.questionPool.entries(),
-                        async (q, result) => {
-                            // assign to next player in round-robin
-                            const player = players[currentPlayerIndex];
-                            currentPlayerIndex =
-                                (currentPlayerIndex + 1) % players.length;
-                            if (!player) {
-                                console.log(
-                                    'No player found for this round, skipping.'
-                                );
-                                return;
-                            }
-                            this.matchService.assignQuestionToPlayer(player.id);
-                            // presentQuestion already ran; record answer and award points
-                            const awarded = this.matchService.recordAnswer(
-                                player.id,
-                                !!result.correct,
-                                q
-                            );
-                            console.log(
-                                result.correct
-                                    ? `Correct! (+${awarded})`
-                                    : `Incorrect. (+${awarded})`
-                            );
-                        }
-                    );
-                }
+                // Use the two-player round flow which assigns one question per player per round
+                await this.handleTurns();
             } else {
                 // Todo: implement json flow
             }

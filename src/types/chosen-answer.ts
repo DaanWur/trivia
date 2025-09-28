@@ -1,5 +1,5 @@
 export type ChosenAnswer = {
     correct: boolean;
-    choice?: number | boolean;
+    choice?: number | boolean | undefined;
     answeredBy?: string;
 };

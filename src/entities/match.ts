@@ -9,25 +9,19 @@ export class Match {
     id: ID;
     players: Player[];
     numberOfRounds: number;
-    leadingPlayer?: Player | null;
-    roundsLeft: number;
-    winner?: Player | null;
     status: MatchStatus;
     createdAt: string;
     questionPool: Map<ID, MultipleChoice | BooleanQuestion>;
-    // playerId -> questionId (or null if none assigned)
     assigned: Record<ID, ID | null>;
+    currentPlayer: Player | null = null;
 
     constructor(players: Player[] = [], numberOfRounds = 1) {
         this.id = uuidv4();
         this.players = players;
         this.numberOfRounds = 0;
-        this.leadingPlayer = null;
-        this.winner = null;
         this.status = 'waiting';
         this.createdAt = new Date().toISOString();
         this.questionPool = new Map();
-        this.roundsLeft = 0; // Math.max(0, numberOfRounds - this.questionPool.size);
         this.assigned = {};
     }
 
@@ -35,29 +29,18 @@ export class Match {
         return this.players.some((p) => p.id === playerId);
     }
 
-    setLeadingPlayer(player: Player | null) {
-        if (player === null) {
-            this.leadingPlayer = null;
-            return;
-        }
-        if (!this.hasPlayer(player.id))
+    setCurrentPlayer(playerId: ID) {
+        const player = this.players.find((p) => p.id === playerId);
+        if (!player) {
             throw new NotFoundError(
-                `player ${player.id} not part of match ${this.id}`
+                `Player with ID ${playerId} not found in match.`
             );
-        this.leadingPlayer = player;
+        }
+        this.currentPlayer = player;
     }
 
-    setWinner(player: Player | null) {
-        if (player === null) {
-            this.winner = null;
-            return;
-        }
-        if (!this.hasPlayer(player.id))
-            throw new NotFoundError(
-                `player ${player.id} not part of match ${this.id}`
-            );
-        this.winner = player;
-        this.status = 'finished';
+    getCurrentPlayer(): Player | null {
+        return this.currentPlayer;
     }
 
     toJSON() {
