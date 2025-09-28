@@ -3,7 +3,7 @@ import { NotFoundError } from './Errors/errors.js';
 import { v4 as uuidv4 } from 'uuid';
 import { Player } from './player.ts';
 import type { MultipleChoice } from './question/multiple-choice.ts';
-import type { BooleanQuestion } from './question/true-false.ts';
+import type { BooleanQuestion } from './question/boolean-question.ts';
 import type { MatchMemento } from '../interfaces/match-memento.ts';
 import { ConcreteMatchMemento } from './concrete-match-memento.ts';
 
@@ -17,6 +17,7 @@ export class Match {
     assigned: Record<ID, ID | null>;
     currentPlayer: Player | null = null;
     currentRound: number = 1;
+    passedQuestion: ID | null = null;
 
     constructor(players: Player[] = [], numberOfRounds = 1) {
         this.id = uuidv4();
@@ -43,6 +44,7 @@ export class Match {
         this.assigned = state.assigned!;
         this.questionPool = new Map(Object.entries(state.questionPool!));
         this.currentRound = state.currentRound ?? 1;
+        this.passedQuestion = state.passedQuestion ?? null;
 
         if (state.players) {
             this.players = state.players.map((p) => {
@@ -97,7 +99,8 @@ export class Match {
             createdAt: this.createdAt,
             questionPool: Object.fromEntries(this.questionPool),
             assigned: this.assigned,
-            currentPlayer: this.currentPlayer
+            currentPlayer: this.currentPlayer,
+            passedQuestion: this.passedQuestion
         };
     }
 }

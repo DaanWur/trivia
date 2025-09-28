@@ -1,4 +1,4 @@
-import { Question } from './question.js';
+import { Question } from './question.ts';
 
 export class BooleanQuestion extends Question {
     // the canonical correct answer for this question

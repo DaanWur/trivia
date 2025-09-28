@@ -24,6 +24,7 @@ class MainRunner {
     private matchCareTaker: Caretaker;
     private isUrl = false;
     private isexit = false;
+    private firstTurn = true;
 
     constructor() {
         this.rl = readline.createInterface({
@@ -117,12 +118,16 @@ class MainRunner {
                 break;
             }
 
+            // Increment round only when drawing a new question (not on first turn)
+            const assignedQuestionId = this.match.assigned[currentPlayer.id];
+            if (!assignedQuestionId && !this.firstTurn) {
+                this.match.currentRound++;
+            }
+
             console.log(`\n-------- Round ${this.match.currentRound} --------`);
             console.log(`${currentPlayer.name}'s turn.`);
 
             let question: Question | undefined;
-            const assignedQuestionId = this.match.assigned[currentPlayer.id];
-
             if (assignedQuestionId) {
                 question = this.match.questionPool.get(assignedQuestionId);
             } else {
@@ -144,6 +149,9 @@ class MainRunner {
             }
 
             this.matchCareTaker.backup();
+
+            // Clear firstTurn flag after the first iteration
+            if (this.firstTurn) this.firstTurn = false;
         }
 
         console.log('\nGame over!');
@@ -252,7 +260,6 @@ class MainRunner {
                 this.match.setCurrentPlayer(nextPlayer);
             }
         } else if (turnResult.turnOver) {
-            this.match.currentRound++;
             const nextPlayer =
                 this.match.players.find((p) => p.id !== currentPlayer.id) ??
                 currentPlayer;

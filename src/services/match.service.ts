@@ -140,6 +140,7 @@ export default class MatchService {
             );
         this.match.assigned[fromPlayerId] = null;
         this.match.assigned[toPlayerId] = qid;
+        this.match.passedQuestion = qid;
     }
 
     /**
@@ -220,6 +221,8 @@ export default class MatchService {
             }
         }
 
+        const isPassedQuestion = this.match.passedQuestion === q.id;
+
         // 2. Handle Correct Answer
         if (answer.correct) {
             const points = this.recordAnswer(playerId, true, q);
@@ -227,11 +230,21 @@ export default class MatchService {
                 pointsAwarded: points,
                 questionPassed: false,
                 skipsRemaining: player.skips,
-                turnOver: true
+                turnOver: !isPassedQuestion
             };
         }
 
         // 3. Handle Incorrect Answer (or skip with no skips left)
+        if (isPassedQuestion) {
+            this.recordAnswer(playerId, false, q);
+            return {
+                pointsAwarded: 0,
+                questionPassed: false,
+                skipsRemaining: player.skips,
+                turnOver: false // Player's turn continues with a new question
+            };
+        }
+
         const currentPlayerIndex = this.match.players.findIndex(
             (p) => p.id === playerId
         );
@@ -286,6 +299,10 @@ export default class MatchService {
 
         if (q) {
             this.match.questionPool.delete(q.id);
+        }
+
+        if (this.match.passedQuestion === q?.id) {
+            this.match.passedQuestion = null;
         }
 
         const awarded = correct && q ? q.points : 0;
