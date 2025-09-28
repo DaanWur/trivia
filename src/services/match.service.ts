@@ -29,44 +29,53 @@ export default class MatchService {
      * @param questions - array of ApiQuestion objects from the API
      */
     createQuestionPool(questions: ApiQuestion[]) {
+        // The official number of rounds is the total questions minus the 4 skip-buffer questions
+        this.match.numberOfRounds = questions.length - 4;
+
         for (const questionData of questions) {
-            let newQuestion: MultipleChoice | BooleanQuestion | undefined;
-            if (questionData.type === 'multiple') {
-                const answers: Array<Answer> = this.createAnswers(
-                    questionData
-                ).map((a) => ({
+            const newQuestion = this.createQuestionFromData(questionData);
+            if (newQuestion) {
+                this.match.questionPool.set(newQuestion.id, newQuestion);
+            }
+        }
+
+        this.match.numberOfRounds = questions.length / 2;
+    }
+
+    private createQuestionFromData(
+        questionData: ApiQuestion
+    ): MultipleChoice | BooleanQuestion | undefined {
+        if (questionData.type === 'multiple') {
+            const answers: Array<Answer> = this.createAnswers(questionData).map(
+                (a) => ({
                     text: decodeHTML(a.text),
                     isCorrect: a.isCorrect
-                }));
-                // simple shuffle
-                const options = this.shuffleAnswers(answers);
+                })
+            );
+            const options = this.shuffleAnswers(answers);
 
-                newQuestion = new MultipleChoice(
-                    decodeHTML(questionData.question),
-                    decodeHTML(questionData.category),
-                    1,
-                    options,
-                    questionData.difficulty
-                );
-            } else if (questionData.type === 'boolean') {
-                const correct =
-                    decodeHTML(questionData.correct_answer) === 'True' ||
-                    decodeHTML(questionData.correct_answer) === 'true';
-                newQuestion = new BooleanQuestion(
-                    decodeHTML(questionData.question),
-                    decodeHTML(questionData.category),
-                    correct,
-                    1,
-                    'True',
-                    'False',
-                    questionData.difficulty
-                );
-            }
-            if (!newQuestion) continue;
-
-            this.match.questionPool.set(newQuestion.id, newQuestion);
-            this.match.numberOfRounds = questions.length / 2;
+            return new MultipleChoice(
+                decodeHTML(questionData.question),
+                decodeHTML(questionData.category),
+                1,
+                options,
+                questionData.difficulty
+            );
+        } else if (questionData.type === 'boolean') {
+            const correct =
+                decodeHTML(questionData.correct_answer) === 'True' ||
+                decodeHTML(questionData.correct_answer) === 'true';
+            return new BooleanQuestion(
+                decodeHTML(questionData.question),
+                decodeHTML(questionData.category),
+                correct,
+                1,
+                'True',
+                'False',
+                questionData.difficulty
+            );
         }
+        return undefined;
     }
 
     private shuffleAnswers(answers: Answer[]): Map<number, Answer> {
@@ -219,6 +228,7 @@ export default class MatchService {
                     turnOver: false // Turn is NOT over, player gets a new question
                 };
             }
+            // If no skips left, fall through to the incorrect answer logic
         }
 
         const isPassedQuestion = this.match.passedQuestion === q.id;
@@ -299,6 +309,7 @@ export default class MatchService {
 
         if (q) {
             this.match.questionPool.delete(q.id);
+            this.match.questionsResolved++;
         }
 
         if (this.match.passedQuestion === q?.id) {
@@ -364,5 +375,16 @@ export default class MatchService {
                 'Cannot add players unless match is in waiting status'
             );
         this.match.players.push(player);
+    }
+
+    determineWinner(): Player | undefined {
+        if (this.match.players.length === 0) return undefined;
+        let winner = this.match.players[0];
+        for (const player of this.match.players) {
+            if (player.points > winner!.points) {
+                winner = player;
+            }
+        }
+        return winner;
     }
 }

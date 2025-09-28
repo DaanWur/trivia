@@ -18,6 +18,7 @@ export class Match {
     currentPlayer: Player | null = null;
     currentRound: number = 1;
     passedQuestion: ID | null = null;
+    questionsResolved: number = 0;
 
     constructor(players: Player[] = [], numberOfRounds = 1) {
         this.id = uuidv4();
@@ -45,6 +46,7 @@ export class Match {
         this.questionPool = new Map(Object.entries(state.questionPool!));
         this.currentRound = state.currentRound ?? 1;
         this.passedQuestion = state.passedQuestion ?? null;
+        this.questionsResolved = state.questionsResolved ?? 0;
 
         if (state.players) {
             this.players = state.players.map((p) => {
@@ -100,7 +102,8 @@ export class Match {
             questionPool: Object.fromEntries(this.questionPool),
             assigned: this.assigned,
             currentPlayer: this.currentPlayer,
-            passedQuestion: this.passedQuestion
+            passedQuestion: this.passedQuestion,
+            questionsResolved: this.questionsResolved,
         };
     }
 }

@@ -13,9 +13,10 @@ This document extracts and translates the requirements from the provided Hebrew 
 
 - At each turn one question is presented with N answer options (commonly 3, but may be more).
 - A designated/current player must answer the presented question.
-    - If the current player selects the correct answer, they receive the point and the turn passes to the other player.
-    - If the current player answers incorrectly, the other player gets a chance to answer the same question. If the second player answers correctly they receive the point; otherwise no points are awarded for that question and play continues.
-- Questions are presented one at a time and removed from the pool once presented (no repeats in the same session, unless explicitly allowed by an extension).
+    - If the current player selects the correct answer, they receive the point and the turn passes to the other player, who receives a new question.
+    - If the current player answers incorrectly, the other player gets a chance to answer the same question.
+    - Regardless of whether the second player answers correctly or not, the turn then passes to them, and they receive a new question.
+- Questions are drawn from a pool that is shuffled at the start of the game. Questions are removed from the pool once answered (no repeats).
 - When all questions have been processed the game ends and the final points are shown.
 
 ## 3) Technical requirements
@@ -33,7 +34,7 @@ This document extracts and translates the requirements from the provided Hebrew 
     - The CLI should re-prompt when the user enters invalid input and accept only valid option values for answers.
     - Display clear prompts showing the available options for each question.
 - Game output
-    - During the run: show each question, answer options, which player is answering, and immediate feedback (Correct / Incorrect and awarded points).
+    - During the run: show each question, answer options, which player is answering, their current total score, and immediate feedback (Correct / Incorrect and awarded points).
     - At the end: print a short summary with each player's final score and the winner.
 - Implementation details
     - Keep question/answer processing deterministic and consistent (shuffle answers for UI but preserve the correct flag internally).
@@ -81,7 +82,7 @@ Notes:
 2. Difficulty-based scoring: use difficulty to weight points (e.g., easy=1, medium=2, hard=3).
 3. Flagging: let a player flag a question as "I don't like this" so it is not shown again in the session (or recorded for curation).
 4. API integration: support the Open Trivia DB API (or similar). Provide an option to pass API parameters (category, difficulty, amount). Example: https://opentdb.com/api_config.php
-5. Retry / Skip policy: configure retries on skip (e.g., allow one immediate retry on skip) or implement a configurable skip-count that consumes additional questions for the same player.
+5. Skip "Lifeline": Each player has 2 "lifelines" they can use to skip a question they don't like. The skipped question is discarded from the game and the player is immediately given a new question from the main pool.
 6. Session recording: export a session summary JSON with the sequence of questions shown, players' answers, and final scores.
 
 ## 7) Quick acceptance criteria (tests / manual checks)

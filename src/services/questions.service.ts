@@ -26,7 +26,8 @@ export default class QuestionService {
                 throw new Error('Failed to fetch questions');
             }
             const data = await res.data;
-            return data.results;
+            const shuffled = _.shuffle(data.results);
+            return shuffled;
         } catch (error) {
             console.error('Error fetching questions from API:', error);
             throw new NotFoundError('Failed to fetch questions');
