@@ -41,7 +41,11 @@ export default class MatchService {
         for (const questionData of gameQuestions) {
             const newQuestion = this.createQuestionFromData(questionData);
             if (newQuestion) {
-                this.match.questionPool.set(newQuestion.id, newQuestion);
+                const category = newQuestion.category.name;
+                if (!this.match.questionPool.has(category)) {
+                    this.match.questionPool.set(category, []);
+                }
+                this.match.questionPool.get(category)!.push(newQuestion);
             }
         }
 
@@ -122,35 +126,6 @@ export default class MatchService {
     }
 
     /**
-     * Handle a player's answer to their currently assigned question.
-     * Awards points when correct, clears the player's assigned question,
-     * and assigns the next available question to the player (if any).
-     * @param playerId - id of the player answering
-     * @param correct - whether the player's answer was correct
-     * @returns an object with awarded points and optionally the next Question
-     */
-    answerQuestion(
-        playerId: ID,
-        correct: boolean
-    ): { awarded: number; nextQuestion?: Question | undefined } {
-        if (!this.match.hasPlayer(playerId))
-            throw new NotFoundError(
-                `player ${playerId} not part of match ${this.match.id}`
-            );
-
-        const qid = this.match.assigned[playerId];
-        if (!qid)
-            throw new InvalidOperationError('no question assigned to player');
-        const q = this.match.questionPool.get(qid) ?? undefined;
-
-        let awarded = 0;
-        if (correct) awarded = q ? q.points : 0;
-        this.match.assigned[playerId] = null;
-        const next = this.assignQuestionToPlayer(playerId);
-        return { awarded, nextQuestion: next };
-    }
-
-    /**
      * Pass the currently assigned question from one player to another.
      * Clears the question for the fromPlayer and assigns the same question id
      * to the toPlayer.
@@ -179,7 +154,7 @@ export default class MatchService {
      * @param playerId - id of the player skipping their question
      * @returns the newly assigned Question or undefined if none available
      */
-    skipQuestion(playerId: ID): Question | undefined {
+    skipQuestion(playerId: ID): void {
         const player = this.match.players.find((p) => p.id === playerId);
         if (!player) {
             throw new NotFoundError(`Player with ID ${playerId} not found.`);
@@ -191,25 +166,22 @@ export default class MatchService {
 
         player.skips--;
 
-        // Discard the current question
-        const currentQuestionId = this.match.assigned[playerId];
-        if (currentQuestionId) {
-            this.match.questionPool.delete(currentQuestionId);
-        }
+        // A skipped question is not "resolved," so we don't increment the
+        // questionsResolved counter. We just clear the current question state.
         this.match.assigned[playerId] = null;
+        this.match.questionInPlay = null;
 
-        // Draw a replacement from the buffer
+        // Draw a replacement from the buffer and add it to the pool
         const replacementQuestion = this.match.questionBuffer.pop();
         if (replacementQuestion) {
-            this.match.questionPool.set(
-                replacementQuestion.id,
-                replacementQuestion
-            );
-            return this.assignQuestionToPlayer(playerId);
+            const category = replacementQuestion.category.name;
+            if (!this.match.questionPool.has(category)) {
+                this.match.questionPool.set(category, []);
+            }
+            this.match.questionPool
+                .get(category)!
+                .push(replacementQuestion);
         }
-
-        // If buffer is empty, just assign from the main pool
-        return this.assignQuestionToPlayer(playerId);
     }
 
     /**
@@ -217,15 +189,21 @@ export default class MatchService {
      * @param playerId - id of the player to assign a question to
      * @returns the assigned Question or undefined if none available
      */
-    assignQuestionToPlayer(playerId: ID): Question | undefined {
+    assignQuestionToPlayer(
+        playerId: ID,
+        category: string
+    ): Question | undefined {
         if (!this.match.hasPlayer(playerId))
             throw new NotFoundError(
                 `player ${playerId} not part of match ${this.match.id}`
             );
-        const q = this.drawQuestion();
+
+        const q = this.drawQuestion(category);
         if (!q) return undefined;
-        // record the assignment in the match and mark the question assigned
+
+        this.match.questionInPlay = q;
         this.match.assigned[playerId] = q.id;
+
         try {
             q.assignTo(playerId);
         } catch (e) {
@@ -320,16 +298,10 @@ export default class MatchService {
 
         let q: Question | undefined = question;
         if (!q) {
-            const qid = this.match.assigned[playerId];
-            if (!qid)
-                throw new InvalidOperationError(
-                    'no question assigned to player'
-                );
-            q = this.match.questionPool.get(qid) ?? undefined;
+            q = this.match.questionInPlay ?? undefined;
         }
 
         if (q) {
-            this.match.questionPool.delete(q.id);
             this.match.questionsResolved++;
         }
 
@@ -342,8 +314,9 @@ export default class MatchService {
             player.addPoints(awarded);
         }
 
-        // clear assignment
+        // clear assignment and question in play
         this.match.assigned[playerId] = null;
+        this.match.questionInPlay = null;
 
         // try to mark question answered if possible
         try {
@@ -359,12 +332,16 @@ export default class MatchService {
      * Draw (remove) the next question from the match's question pool iterator.
      * Returns undefined when the pool is empty.
      */
-    drawQuestion(): Question | undefined {
-        const it = this.match.questionPool.values();
-        const next = it.next();
-        if (next.done) return undefined;
-        const q = next.value;
-        return q;
+    drawQuestion(category: string): Question | undefined {
+        const questions = this.match.questionPool.get(category);
+        if (questions && questions.length > 0) {
+            const question = questions.pop();
+            if (questions.length === 0) {
+                this.match.questionPool.delete(category);
+            }
+            return question;
+        }
+        return undefined;
     }
 
     /**
@@ -391,15 +368,6 @@ export default class MatchService {
             throw new DuplicateError(`player ${player.id} already in match`);
 
         this.match.players.push(player);
-
-        // auto-assign question if match already started
-        if (this.match.status === 'in-progress') {
-            const q = this.assignQuestionToPlayer(player.id);
-            if (!q)
-                throw new InvalidOperationError(
-                    'no available questions to assign'
-                );
-        }
     }
 
     /**

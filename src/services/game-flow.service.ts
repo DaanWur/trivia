@@ -17,11 +17,68 @@ export class GameFlow {
         private ask: (question: string) => Promise<string>
     ) {}
 
-    public async handleQuestion(question: Question, currentPlayer: Player) {
+    public async getQuestionForPlayer(
+        currentPlayer: Player
+    ): Promise<Question | undefined> {
+        if (this.match.questionInPlay) {
+            return this.match.questionInPlay;
+        }
+
+        const assignedQuestionId = this.match.assigned[currentPlayer.id];
+
+        if (assignedQuestionId) {
+            // A question has been passed to this player
+            for (const questions of this.match.questionPool.values()) {
+                const question = questions.find(
+                    (q) => q.id === assignedQuestionId
+                );
+                if (question) return question;
+            }
+        }
+
+        // Loop until a question is successfully assigned or the pool is empty
+        while (this.match.questionPool.size > 0) {
+            const category = await this.promptForCategory();
+            const question = this.matchService.assignQuestionToPlayer(
+                currentPlayer.id,
+                category
+            );
+
+            if (question) {
+                return question;
+            }
+
+            Logger.warning(
+                'No questions available in that category. Please choose another.'
+            );
+        }
+
+        return undefined; // No questions left in any category
+    }
+
+    public async processQuestion(
+        question: Question,
+        currentPlayer: Player
+    ): Promise<void> {
         if (question.type === 'multiple') {
             await this.multipleQuestionFlow(question, currentPlayer);
         } else if (question.type === 'boolean') {
             await this.booleanQuestionFlow(question, currentPlayer);
+        }
+    }
+
+    private async promptForCategory(): Promise<string> {
+        const categories = Array.from(this.match.questionPool.keys());
+        Logger.info('Please choose a category:');
+        categories.forEach((c, i) => Logger.info(`${i + 1}: ${c}`));
+
+        while (true) {
+            const choiceStr = await this.ask('Enter the number of your choice: ');
+            const choice = parseInt(choiceStr) - 1;
+            if (choice >= 0 && choice < categories.length) {
+                return categories[choice]!;
+            }
+            Logger.error('Invalid choice, please try again.');
         }
     }
 
@@ -42,7 +99,7 @@ export class GameFlow {
 
             if (userAnswerStr.toLowerCase() === 'skip') {
                 if (currentPlayer.skips > 0) {
-                    this.skipFlow(currentPlayer, question);
+                    await this.skipFlow(currentPlayer);
                     return;
                 } else {
                     Logger.warning(
@@ -70,12 +127,14 @@ export class GameFlow {
         this.moveToNextPlayer(turnResult, currentPlayer);
     }
 
-    private skipFlow(currentPlayer: Player, currentQuestion: Question) {
+    private async skipFlow(currentPlayer: Player) {
         try {
             this.matchService.skipQuestion(currentPlayer.id);
             Logger.info(
                 `You used a skip. You have ${currentPlayer.skips} skips left.`
             );
+            // Manually advance to the next player
+            this.moveToNextPlayer({ turnOver: true } as any, currentPlayer);
         } catch (error: any) {
             if (error instanceof InvalidOperationError) {
                 Logger.warning(error.message);
@@ -105,7 +164,7 @@ export class GameFlow {
 
             if (userAnswerStr.toLowerCase() === 'skip') {
                 if (currentPlayer.skips > 0) {
-                    this.skipFlow(currentPlayer, question);
+                    await this.skipFlow(currentPlayer);
                     return;
                 } else {
                     Logger.warning(
@@ -155,11 +214,8 @@ export class GameFlow {
                 this.match.players.find((p) => p.id !== currentPlayer.id) ??
                 currentPlayer;
             this.match.setCurrentPlayer(nextPlayer);
-        } else {
-            // The turn is not over, so we stay with the current player
-            // and assign a new question.
-            this.matchService.assignQuestionToPlayer(currentPlayer.id);
         }
+        // If the turn is not over, we do nothing, and the current player remains the same.
     }
 
     private notifyTurnResult(turnResult: {

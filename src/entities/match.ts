@@ -7,8 +7,9 @@ import { ConcreteMatchMemento } from './concrete-match-memento.ts';
 export class Match {
     public id: ID;
     public players: Player[] = [];
-    public questionPool: Map<ID, Question> = new Map();
+    public questionPool: Map<string, Question[]> = new Map();
     public questionBuffer: Question[] = [];
+    public questionInPlay: Question | null = null;
     public assigned: Record<ID, ID | null> = {};
     public status: 'waiting' | 'in-progress' | 'finished' = 'waiting';
     public passedQuestion: ID | null = null;
@@ -55,6 +56,7 @@ export class Match {
             return player;
         });
         this.questionPool = state.questionPool!;
+        this.questionInPlay = state.questionInPlay!;
         this.assigned = state.assigned!;
         this.status = state.status!;
         this.passedQuestion = state.passedQuestion!;
@@ -79,6 +81,7 @@ export class Match {
             id: this.id,
             players: this.players,
             questionPool: this.questionPool,
+            questionInPlay: this.questionInPlay,
             assigned: this.assigned,
             status: this.status,
             passedQuestion: this.passedQuestion,

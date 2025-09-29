@@ -197,14 +197,9 @@ class MainRunner {
             Logger.turn(`-------- Round ${this.match.currentRound} --------`);
             Logger.turn(`${currentPlayer.name}'s turn.`);
 
-            let question: Question | undefined;
-            if (assignedQuestionId) {
-                question = this.match.questionPool.get(assignedQuestionId);
-            } else {
-                question = this.matchService.assignQuestionToPlayer(
-                    currentPlayer.id
-                );
-            }
+            const question = await this.gameFlow.getQuestionForPlayer(
+                currentPlayer
+            );
 
             if (!question) {
                 Logger.warning('No more questions available. Ending game.');
@@ -212,7 +207,7 @@ class MainRunner {
                 break;
             }
 
-            await this.gameFlow.handleQuestion(question, currentPlayer);
+            await this.gameFlow.processQuestion(question, currentPlayer);
 
             this.matchCareTaker.backup();
 
