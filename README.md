@@ -7,8 +7,9 @@ A classic two-player, turn-based trivia game that runs in your command line. Fet
 - **Two-Player Gameplay:** Compete against a friend in a hot-seat style match.
 - **Dynamic Question Loading:** Load questions from the Open Trivia DB API or a local JSON file.
 - **Skip "Lifelines":** Each player gets two lifelines to skip a tough question and get a new one.
-- **Configurable Games:** Use command-line arguments to customize the number of questions.
+- **Configurable Games:** Use command-line arguments to customize the number of questions, difficulty, and question type.
 - **Colorful Interface:** An interactive and user-friendly CLI with colored output.
+- **Tie-Breaker:** A tie-breaker round to determine the winner in case of a tie.
 
 ## Installation
 
@@ -53,12 +54,14 @@ npm run start -- --file ./data/questions-sample.json
 
 Here are all the available options you can use:
 
-| Flag      | Alias | Description                                  | Default Value                     |
-| --------- | ----- | -------------------------------------------- | --------------------------------- |
-| `--url`   | `-u`  | Fetch questions from the Open Trivia DB API. | (Enabled if `--file` is not used) |
-| `--file`  | `-f`  | Path to a local JSON file with questions.    | `data/questions-sample.json`      |
-| `--count` | `-c`  | Number of questions per player.              | `5`                               |
-| `--help`  | `-h`  | Show the help message.                       |                                   |
+| Flag | Alias | Description | Default Value |
+| --- | --- | --- | --- |
+| `--url` | `-u` | Fetch questions from the Open Trivia DB API. | (Enabled if `--file` is not used) |
+| `--file` | `-f` | Path to a local JSON file with questions. | `data/questions-sample.json` |
+| `--count` | `-c` | Number of questions per player. | `5` |
+| `--difficulty` | `-d` | Set the difficulty of questions (easy, medium, hard). | |
+| `--questionType` | `-t` | Set the type of questions (multiple, boolean). | |
+| `--help` | `-h` | Show the help message. | |
 
 **To see the help message with all options, run:**
 
