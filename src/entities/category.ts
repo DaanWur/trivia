@@ -38,28 +38,9 @@ export class Category {
         return c;
     }
 
-    static getOrCreate(id: ID, name: string): Category {
-        const existingById = Category.byId.get(id);
-
-        if (existingById) {
-            // if name differs, that's a conflict
-            if (existingById.name !== name) {
-                throw new DuplicateError(
-                    `Category id=${id} already exists with a different name ('${existingById.name}' != '${name}')`
-                );
-            }
-            return existingById;
-        }
-
+    static findOrCreateByName(name: string): Category {
         const existingByName = Category.byName.get(name);
-
         if (existingByName) {
-            // if id differs, that's a conflict
-            if (existingByName.id !== id) {
-                throw new DuplicateError(
-                    `Category name='${name}' already exists with a different id (${existingByName.id} != ${id})`
-                );
-            }
             return existingByName;
         }
         return Category.createCategory(name);

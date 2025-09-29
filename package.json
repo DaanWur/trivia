@@ -4,19 +4,20 @@
         "start": "tsx src/main.ts"
     },
     "devDependencies": {
-        "@types/yargs": "^17.0.32",
         "@types/lodash": "^4.17.20",
         "@types/node": "^24.5.2",
+        "@types/yargs": "^17.0.32",
         "esbuild": "^0.25.10",
         "prettier": "3.6.2",
         "tsx": "^4.20.6",
         "typescript": "^5.9.2"
     },
     "dependencies": {
-        "yargs": "^17.7.2",
         "axios": "^1.12.2",
+        "chalk": "^5.6.2",
         "entities": "^7.0.0",
         "lodash": "^4.17.21",
-        "uuid": "^13.0.0"
+        "uuid": "^13.0.0",
+        "yargs": "^17.7.2"
     }
 }

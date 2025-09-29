@@ -1,14 +1,9 @@
+import { GameFlow } from './services/game-flow.service.ts';
+import { Logger } from './services/logger.service.ts';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import * as readline from 'readline';
-import {
-    BooleanQuestion,
-    Match,
-    MultipleChoice,
-    Player,
-    Question,
-    type ID
-} from './entities/index.ts';
+import { Match, Player, Question, type ID } from './entities/index.ts';
 import MatchService from './services/match.service.ts';
 import QuestionService from './services/questions.service.ts';
 import { Caretaker } from './entities/caretaker.ts';
@@ -24,6 +19,7 @@ class MainRunner {
     private matchService: MatchService;
     private questionService: QuestionService;
     private matchCareTaker: Caretaker;
+    private gameFlow: GameFlow;
     private isUrl = false;
     private isexit = false;
     private firstTurn = true;
@@ -37,6 +33,9 @@ class MainRunner {
         this.match = new Match();
         this.matchService = new MatchService(this.match);
         this.matchCareTaker = new Caretaker(this.match);
+        this.gameFlow = new GameFlow(this.match, this.matchService, (q) =>
+            this.ask(q)
+        );
     }
 
     private async setup() {
@@ -61,7 +60,7 @@ class MainRunner {
             .alias('help', 'h')
             .parse();
 
-        console.log(`Welcome to Trivia! 
+        Logger.info(`Welcome to Trivia! 
                      Your skill and knowledge will be tested, don't let your guard down!`);
 
         const useUrl = argv.url || !argv.file;
@@ -70,6 +69,9 @@ class MainRunner {
 
         // Create players first
         const [firstPlayer, secondPlayer] = await this.createPlayers();
+
+        // Set the official number of rounds for the match
+        this.match.numberOfRounds = count;
 
         // Create the question pool
         await this.createQuestionPool(useUrl, filePath, count);
@@ -86,13 +88,12 @@ class MainRunner {
         numberOfQuestions: number = 10
     ) => {
         if (isNaN(numberOfQuestions) || numberOfQuestions <= 0) {
-            console.log('Invalid number, please enter a positive integer.');
+            Logger.error('Invalid number, please enter a positive integer.');
             return;
         }
         try {
             // Fetch 4 extra questions for the skip buffer
-            const totalQuestionsToFetch =
-                numberOfQuestions * this.match.players.length + 4;
+            const totalQuestionsToFetch = numberOfQuestions + 4;
 
             const questions = isUrl
                 ? await this.questionService.getQuestionsFromApi(
@@ -103,7 +104,11 @@ class MainRunner {
             if (this.matchService)
                 this.matchService.createQuestionPool(questions);
         } catch (error) {
-            console.error(error);
+            Logger.error(
+                `Failed to load questions. Please check your connection or file path.`
+            );
+            console.error(error); // Also log the original error for debugging
+            process.exit(1);
         }
     };
 
@@ -132,165 +137,6 @@ class MainRunner {
         return [firstPlayer, secondPlayer];
     }
 
-    private calculateRounds(num: number): number {
-        if (num % 2 !== 0) {
-            console.log(
-                'Number of questions should be even, incrementing by 1.'
-            );
-            num += 1;
-        }
-        // add 4 more questions to support skips
-        num += 4;
-        return Math.floor(num / this.match.players.length);
-    }
-
-    private async booleanQuestionFlow(
-        question: Question,
-        currentPlayer: Player
-    ) {
-        const bq = question as BooleanQuestion;
-        console.log(bq.text);
-
-        let turnResult;
-        let userAnswer: boolean | undefined;
-
-        while (userAnswer === undefined) {
-            const userAnswerStr = await this.ask(
-                `${currentPlayer.name}, please enter true or false, or type 'skip': `
-            );
-
-            if (userAnswerStr.toLowerCase() === 'skip') {
-                if (currentPlayer.skips > 0) {
-                    this.skipFlow(currentPlayer, question);
-                    return;
-                } else {
-                    console.log(
-                        'You have no skips left! Please answer the question.'
-                    );
-                    continue;
-                }
-            }
-
-            const lowerCaseAnswer = userAnswerStr.toLowerCase();
-            if (lowerCaseAnswer === 'true' || lowerCaseAnswer === 'false') {
-                userAnswer = lowerCaseAnswer === 'true';
-            } else {
-                console.log("Invalid input. Please enter 'true' or 'false'.");
-            }
-        }
-
-        const isCorrect = bq.checkAnswer(userAnswer);
-        turnResult = this.matchService.handlePlayerAnswer(
-            currentPlayer.id,
-            { choice: userAnswer, correct: isCorrect },
-            question
-        );
-        this.notifyTurnResult(turnResult);
-        this.moveToNextPlayer(turnResult, currentPlayer);
-    }
-
-    private skipFlow(currentPlayer: Player, currentQuestion: Question) {
-        currentPlayer.skips--;
-        // Discard the current question
-        this.matchService.recordAnswer(currentPlayer.id, false, currentQuestion);
-        // Immediately assign a new question from the main pool
-        this.matchService.assignQuestionToPlayer(currentPlayer.id);
-        console.log(
-            `You used a skip. You have ${currentPlayer.skips} skips left.`
-        );
-    }
-
-    private async multipleQuestionFlow(
-        question: Question,
-        currentPlayer: Player
-    ) {
-        const mcq = question as MultipleChoice;
-        console.log(mcq.text);
-        for (const [key, answer] of mcq.options) {
-            console.log(`${key}: ${answer.text}`);
-        }
-
-        let turnResult;
-        let userAnswer: number | undefined;
-
-        while (userAnswer === undefined) {
-            const userAnswerStr = await this.ask(
-                `${currentPlayer.name}, please select an option (number) or type 'skip': `
-            );
-
-            if (userAnswerStr.toLowerCase() === 'skip') {
-                if (currentPlayer.skips > 0) {
-                    this.skipFlow(currentPlayer, question);
-                    return;
-                } else {
-                    console.log(
-                        'You have no skips left! Please answer the question.'
-                    );
-                    continue;
-                }
-            }
-
-            const parsedAnswer = parseInt(userAnswerStr);
-            if (!isNaN(parsedAnswer) && mcq.options.has(parsedAnswer)) {
-                userAnswer = parsedAnswer;
-            } else {
-                console.log('Invalid option. Please try again.');
-            }
-        }
-
-        const isCorrect = mcq.checkAnswer(userAnswer);
-        turnResult = this.matchService.handlePlayerAnswer(
-            currentPlayer.id,
-            { choice: userAnswer, correct: isCorrect },
-            question
-        );
-        this.notifyTurnResult(turnResult);
-        this.moveToNextPlayer(turnResult, currentPlayer);
-    }
-
-    private moveToNextPlayer(
-        turnResult: {
-            nextPlayerId?: ID;
-            pointsAwarded: number;
-            questionPassed: boolean;
-            skipsRemaining: number;
-            turnOver: boolean;
-        },
-        currentPlayer: Player
-    ) {
-        if (turnResult.questionPassed && turnResult.nextPlayerId) {
-            const nextPlayer = this.match.players.find(
-                (p) => p.id === turnResult.nextPlayerId
-            );
-            if (nextPlayer) {
-                this.match.setCurrentPlayer(nextPlayer);
-            }
-        } else if (turnResult.turnOver) {
-            const nextPlayer =
-                this.match.players.find((p) => p.id !== currentPlayer.id) ??
-                currentPlayer;
-            this.match.setCurrentPlayer(nextPlayer);
-        }
-    }
-
-    private notifyTurnResult(turnResult: {
-        nextPlayerId?: ID;
-        pointsAwarded: number;
-        questionPassed: boolean;
-        skipsRemaining: number;
-        turnOver: boolean;
-    }) {
-        if (turnResult.pointsAwarded > 0) {
-            console.log(
-                `Correct! You earned ${turnResult.pointsAwarded} points.`
-            );
-        } else if (turnResult.questionPassed) {
-            console.log(`The question has been passed to the next player.`);
-        } else {
-            console.log('Wrong answer!');
-        }
-    }
-
     public async run() {
         // Initial greeting & setup from args
         await this.setup();
@@ -302,7 +148,7 @@ class MainRunner {
         ) {
             const currentPlayer = this.match.getCurrentPlayer();
             if (!currentPlayer) {
-                console.log('Error: No current player set. Ending game.');
+                Logger.error('Error: No current player set. Ending game.');
                 this.match.status = 'finished';
                 break;
             }
@@ -314,11 +160,11 @@ class MainRunner {
             }
 
             const [p1, p2] = this.match.players;
-            console.log(
+            Logger.score(
                 `\n${p1?.name}: ${p1?.points} points | ${p2?.name}: ${p2?.points} points`
             );
-            console.log(`-------- Round ${this.match.currentRound} --------`);
-            console.log(`${currentPlayer.name}'s turn.`);
+            Logger.turn(`-------- Round ${this.match.currentRound} --------`);
+            Logger.turn(`${currentPlayer.name}'s turn.`);
 
             let question: Question | undefined;
             if (assignedQuestionId) {
@@ -330,16 +176,12 @@ class MainRunner {
             }
 
             if (!question) {
-                console.log('No more questions available. Ending game.');
+                Logger.warning('No more questions available. Ending game.');
                 this.match.status = 'finished';
                 break;
             }
 
-            if (question.type === 'multiple') {
-                await this.multipleQuestionFlow(question, currentPlayer);
-            } else if (question.type === 'boolean') {
-                await this.booleanQuestionFlow(question, currentPlayer);
-            }
+            await this.gameFlow.handleQuestion(question, currentPlayer);
 
             this.matchCareTaker.backup();
 
@@ -347,14 +189,14 @@ class MainRunner {
             if (this.firstTurn) this.firstTurn = false;
         }
 
-        console.log('\nGame over!');
+        Logger.info('\nGame over!');
         const winner = this.matchService.determineWinner();
-        console.log('And the winner is...');
-        console.log('Get ready....');
-        console.log(
+        Logger.success('And the winner is...');
+        Logger.success('Get ready....');
+        Logger.success(
             `${winner?.name} with ${winner?.points} points! Congratulations!`
         );
-        console.log("There is not prize, but you're a winner in life!");
+        Logger.info("There is not prize, but you're a winner in life!");
     }
 }
 

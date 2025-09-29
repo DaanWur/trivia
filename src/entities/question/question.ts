@@ -1,3 +1,4 @@
+import { Category } from '../category.ts';
 import type { ID } from '../types.js';
 import { InvalidOperationError } from '../Errors/errors.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -6,7 +7,7 @@ export class Question {
     id: ID;
     type: 'multiple' | 'boolean';
     text: string;
-    categoryName: string;
+    category: Category;
     assignedTo?: ID | null;
     answeredBy?: ID | null;
     points: number;
@@ -22,7 +23,7 @@ export class Question {
     ) {
         this.id = uuidv4();
         this.text = text;
-        this.categoryName = categoryName;
+        this.category = Category.findOrCreateByName(categoryName);
         this.type = type;
         this.points = points;
         this.createdAt = new Date().toISOString();
@@ -67,7 +68,7 @@ export class Question {
         return {
             id: this.id,
             text: this.text,
-            categoryName: this.categoryName,
+            category: this.category.toJSON(),
             assignedTo: this.assignedTo,
             answeredBy: this.answeredBy,
             points: this.points,
