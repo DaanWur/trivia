@@ -1,7 +1,14 @@
 {
+    "name": "trivia",
+    "version": "1.0.0",
+    "description": "A CLI trivia game.",
     "type": "module",
+    "bin": {
+        "trivia": "./dist/main.js"
+    },
     "scripts": {
-        "start": "tsx src/main.ts"
+        "start": "tsx src/main.ts",
+        "build": "esbuild src/main.ts --bundle --platform=node --outfile=dist/main.js --format=esm"
     },
     "devDependencies": {
         "@types/he": "^1.2.3",

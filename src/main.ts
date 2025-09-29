@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { Match, Player } from './entities/index.ts';
 import { GameFlow } from './services/game-flow.service.ts';
 import { Logger } from './services/logger.service.ts';
