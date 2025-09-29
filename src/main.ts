@@ -56,6 +56,19 @@ class MainRunner {
                 type: 'boolean',
                 description: 'Fetch questions from the Open Trivia DB API'
             })
+            .option('difficulty', {
+                alias: 'd',
+                type: 'string',
+                description:
+                    'Set the difficulty of questions (easy, medium, hard)',
+                choices: ['easy', 'medium', 'hard']
+            })
+            .option('questionType', {
+                alias: 't',
+                type: 'string',
+                description: 'Set the type of questions (multiple, boolean)',
+                choices: ['multiple', 'boolean']
+            })
             .help()
             .alias('help', 'h')
             .parse();
@@ -66,6 +79,11 @@ class MainRunner {
         const useUrl = argv.url || !argv.file;
         const filePath = argv.file || 'data/questions-sample.json';
         const count = argv.count;
+        const difficulty = argv.difficulty;
+        const questionType = argv.questionType as
+            | 'multiple'
+            | 'boolean'
+            | undefined;
 
         // Create players first
         const [firstPlayer, secondPlayer] = await this.createPlayers();
@@ -74,7 +92,13 @@ class MainRunner {
         this.match.numberOfRounds = count;
 
         // Create the question pool
-        await this.createQuestionPool(useUrl, filePath, count);
+        await this.createQuestionPool(
+            useUrl,
+            filePath,
+            count,
+            difficulty,
+            questionType
+        );
 
         // Save initial state
         this.match.setCurrentPlayer(firstPlayer);
@@ -85,7 +109,9 @@ class MainRunner {
     private createQuestionPool = async (
         isUrl: boolean,
         filePath: string = 'data/questions-sample.json',
-        numberOfQuestions: number = 10
+        numberOfQuestions: number = 10,
+        difficulty?: string,
+        questionType?: 'multiple' | 'boolean'
     ) => {
         if (isNaN(numberOfQuestions) || numberOfQuestions <= 0) {
             Logger.error('Invalid number, please enter a positive integer.');
@@ -97,7 +123,9 @@ class MainRunner {
 
             const questions = isUrl
                 ? await this.questionService.getQuestionsFromApi(
-                      totalQuestionsToFetch
+                      totalQuestionsToFetch,
+                      difficulty,
+                      questionType
                   )
                 : await this.questionService.readQuestionsFromJson(filePath);
 

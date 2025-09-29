@@ -15,6 +15,7 @@ import type { ApiQuestion } from '../types/api-question.ts';
 import type { ChosenAnswer } from '../types/chosen-answer.ts';
 import type Answer from '../types/multiple-choice-answer.ts';
 import { decodeHTML } from 'entities';
+import { Logger } from './logger.service.ts';
 
 export default class MatchService {
     constructor(private match: Match) {}
@@ -45,6 +46,16 @@ export default class MatchService {
     private createQuestionFromData(
         questionData: ApiQuestion
     ): MultipleChoice | BooleanQuestion | undefined {
+        if (
+            !questionData.type ||
+            !questionData.question ||
+            !questionData.correct_answer ||
+            !questionData.incorrect_answers
+        ) {
+            Logger.warning('Skipping malformed question object.');
+            return undefined;
+        }
+
         if (questionData.type === 'multiple') {
             const answers: Array<Answer> = this.createAnswers(questionData).map(
                 (a) => ({
@@ -216,71 +227,50 @@ export default class MatchService {
             throw new NotFoundError(`Player with ID ${playerId} not found.`);
         }
 
-        // 1. Handle Skip Attempt
-        if (answer.choice === undefined) {
-            if (player.skips > 0) {
-                player.skips--;
-                this.recordAnswer(playerId, false, q); // Consume the question
-                return {
-                    pointsAwarded: 0,
-                    questionPassed: false,
-                    skipsRemaining: player.skips,
-                    turnOver: false // Turn is NOT over, player gets a new question
-                };
-            }
-            // If no skips left, fall through to the incorrect answer logic
-        }
-
         const isPassedQuestion = this.match.passedQuestion === q.id;
 
-        // 2. Handle Correct Answer
         if (answer.correct) {
             const points = this.recordAnswer(playerId, true, q);
             return {
                 pointsAwarded: points,
                 questionPassed: false,
                 skipsRemaining: player.skips,
-                turnOver: !isPassedQuestion
+                turnOver: !isPassedQuestion,
             };
         }
 
-        // 3. Handle Incorrect Answer (or skip with no skips left)
+        // Incorrect answer
         if (isPassedQuestion) {
+            // Second player answered incorrectly
             this.recordAnswer(playerId, false, q);
             return {
                 pointsAwarded: 0,
                 questionPassed: false,
                 skipsRemaining: player.skips,
-                turnOver: false // Player's turn continues with a new question
+                turnOver: false,
             };
+        } else {
+            // First player answered incorrectly, pass the question
+            const nextPlayer = this.match.players.find((p) => p.id !== playerId);
+            if (nextPlayer) {
+                this.passQuestion(playerId, nextPlayer.id);
+                return {
+                    nextPlayerId: nextPlayer.id,
+                    pointsAwarded: 0,
+                    questionPassed: true,
+                    skipsRemaining: player.skips,
+                    turnOver: false,
+                };
+            }
         }
 
-        const currentPlayerIndex = this.match.players.findIndex(
-            (p) => p.id === playerId
-        );
-        const nextPlayer =
-            this.match.players[
-                (currentPlayerIndex + 1) % this.match.players.length
-            ];
-
-        if (nextPlayer && nextPlayer.id !== playerId) {
-            this.passQuestion(playerId, nextPlayer.id);
-            return {
-                nextPlayerId: nextPlayer.id,
-                pointsAwarded: 0,
-                questionPassed: true,
-                skipsRemaining: player.skips,
-                turnOver: false // The "turn" continues with the next player on the same question
-            };
-        }
-
-        // If no other player to pass to, the turn is over for this question.
+        // Should not be reached in a two-player game
         this.recordAnswer(playerId, false, q);
         return {
             pointsAwarded: 0,
             questionPassed: false,
             skipsRemaining: player.skips,
-            turnOver: true
+            turnOver: true,
         };
     }
 
@@ -366,25 +356,50 @@ export default class MatchService {
      */
     addPlayer(player: Player) {
         if (!player) throw new InvalidOperationError('player required');
-        if (this.match.players.some((p) => p.id === player.id))
-            throw new DuplicateError(
-                `player ${player.id} already part of match ${this.match.id}`
-            );
-        if (this.match.status !== 'waiting')
-            throw new InvalidOperationError(
-                'Cannot add players unless match is in waiting status'
-            );
+        if (this.match.hasPlayer(player.id))
+            throw new DuplicateError(`player ${player.id} already in match`);
+
         this.match.players.push(player);
+
+        // auto-assign question if match already started
+        if (this.match.status === 'in-progress') {
+            const q = this.assignQuestionToPlayer(player.id);
+            if (!q)
+                throw new InvalidOperationError(
+                    'no available questions to assign'
+                );
+        }
+    }
+
+    /**
+     * Remove a player from the match. Validates match state and player existence.
+     * @param playerId - id of the player to remove
+     */
+    removePlayer(playerId: ID) {
+        if (this.match.status === 'in-progress')
+            throw new InvalidOperationError('cannot remove player during match');
+        const idx = this.match.players.findIndex((p) => p.id === playerId);
+        if (idx === -1) throw new NotFoundError(`player ${playerId} not found`);
+
+        this.match.players.splice(idx, 1);
     }
 
     determineWinner(): Player | undefined {
-        if (this.match.players.length === 0) return undefined;
+        if (this.match.players.length === 0) {
+            return undefined;
+        }
+
         let winner = this.match.players[0];
+        if (!winner) {
+            return undefined;
+        }
+
         for (const player of this.match.players) {
-            if (player.points > winner!.points) {
+            if (player.points > winner.points) {
                 winner = player;
             }
         }
+
         return winner;
     }
 }

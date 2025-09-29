@@ -154,6 +154,10 @@ export class GameFlow {
                 this.match.players.find((p) => p.id !== currentPlayer.id) ??
                 currentPlayer;
             this.match.setCurrentPlayer(nextPlayer);
+        } else {
+            // The turn is not over, so we stay with the current player
+            // and assign a new question.
+            this.matchService.assignQuestionToPlayer(currentPlayer.id);
         }
     }
 
