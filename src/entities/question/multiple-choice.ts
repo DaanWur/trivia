@@ -18,11 +18,4 @@ export class MultipleChoice extends Question {
         const answer = this.options.get(userChoice);
         return answer ? answer.isCorrect : false;
     }
-
-    toJSON() {
-        return {
-            ...super.toJSON(),
-            options: this.options
-        };
-    }
 }

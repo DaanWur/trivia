@@ -1,5 +1,4 @@
 import type { ID } from './types.js';
-import { DuplicateError, NotFoundError } from './Errors/errors.js';
 import { v4 as uuidv4 } from 'uuid';
 
 export class Category {
@@ -13,29 +12,12 @@ export class Category {
         this.name = name;
     }
 
-    toJSON() {
-        return { id: this.id, name: this.name };
-    }
-
     static getById(id: ID): Category | undefined {
         return Category.byId.get(id);
     }
 
-    static getByIdOrThrow(id: ID): Category {
-        const c = Category.getById(id);
-        if (!c) throw new NotFoundError(`Category with id=${id} not found`);
-        return c;
-    }
-
     static getByName(name: string): Category | undefined {
         return Category.byName.get(name);
-    }
-
-    static getByNameOrThrow(name: string): Category {
-        const c = Category.getByName(name);
-        if (!c)
-            throw new NotFoundError(`Category with name='${name}' not found`);
-        return c;
     }
 
     static findOrCreateByName(name: string): Category {
@@ -52,9 +34,5 @@ export class Category {
         Category.byId.set(newId, c);
         Category.byName.set(name, c);
         return c;
-    }
-
-    static all(): Category[] {
-        return Array.from(Category.byId.values());
     }
 }

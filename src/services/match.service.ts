@@ -60,6 +60,12 @@ export default class MatchService {
     private createQuestionFromData(
         questionData: ApiQuestion
     ): MultipleChoice | BooleanQuestion | undefined {
+        const points =
+            questionData.difficulty === 'easy'
+                ? 1
+                : questionData.difficulty === 'medium'
+                  ? 2
+                  : 3;
         if (
             !questionData.type ||
             !questionData.question ||
@@ -82,7 +88,7 @@ export default class MatchService {
             return new MultipleChoice(
                 decodeHTML(questionData.question),
                 decodeHTML(questionData.category),
-                1,
+                points,
                 options,
                 questionData.difficulty
             );
@@ -94,7 +100,7 @@ export default class MatchService {
                 decodeHTML(questionData.question),
                 decodeHTML(questionData.category),
                 correct,
-                1,
+                points,
                 'True',
                 'False',
                 questionData.difficulty
@@ -178,9 +184,7 @@ export default class MatchService {
             if (!this.match.questionPool.has(category)) {
                 this.match.questionPool.set(category, []);
             }
-            this.match.questionPool
-                .get(category)!
-                .push(replacementQuestion);
+            this.match.questionPool.get(category)!.push(replacementQuestion);
         }
     }
 
@@ -244,7 +248,7 @@ export default class MatchService {
                 pointsAwarded: points,
                 questionPassed: false,
                 skipsRemaining: player.skips,
-                turnOver: !isPassedQuestion,
+                turnOver: !isPassedQuestion
             };
         }
 
@@ -256,11 +260,13 @@ export default class MatchService {
                 pointsAwarded: 0,
                 questionPassed: false,
                 skipsRemaining: player.skips,
-                turnOver: false,
+                turnOver: false
             };
         } else {
             // First player answered incorrectly, pass the question
-            const nextPlayer = this.match.players.find((p) => p.id !== playerId);
+            const nextPlayer = this.match.players.find(
+                (p) => p.id !== playerId
+            );
             if (nextPlayer) {
                 this.passQuestion(playerId, nextPlayer.id);
                 return {
@@ -268,7 +274,7 @@ export default class MatchService {
                     pointsAwarded: 0,
                     questionPassed: true,
                     skipsRemaining: player.skips,
-                    turnOver: false,
+                    turnOver: false
                 };
             }
         }
@@ -279,7 +285,7 @@ export default class MatchService {
             pointsAwarded: 0,
             questionPassed: false,
             skipsRemaining: player.skips,
-            turnOver: true,
+            turnOver: true
         };
     }
 
@@ -309,7 +315,7 @@ export default class MatchService {
             this.match.passedQuestion = null;
         }
 
-        const awarded = correct && q ? q.points : 0;
+        const awarded = correct && q ? this.calculatePoints(q) : 0;
         if (awarded > 0) {
             player.addPoints(awarded);
         }
@@ -326,6 +332,19 @@ export default class MatchService {
         }
 
         return awarded;
+    }
+
+    private calculatePoints(question: Question): number {
+        switch (question.difficulty) {
+            case 'easy':
+                return 1;
+            case 'medium':
+                return 2;
+            case 'hard':
+                return 3;
+            default:
+                return 1;
+        }
     }
 
     /**
@@ -387,18 +406,75 @@ export default class MatchService {
         if (this.match.players.length === 0) {
             return undefined;
         }
+        if (this.match.players.length === 1) {
+            return this.match.players[0];
+        }
 
-        let winner = this.match.players[0];
-        if (!winner) {
+        const sortedPlayers = [...this.match.players].sort(
+            (a, b) => b.points - a.points
+        );
+
+        if (sortedPlayers[0]!.points === sortedPlayers[1]!.points) {
+            // It's a tie, so we return undefined
             return undefined;
         }
 
-        for (const player of this.match.players) {
-            if (player.points > winner.points) {
-                winner = player;
-            }
+        return sortedPlayers[0];
+    }
+
+    async handleTieBreaker(
+        player1: Player,
+        player2: Player,
+        ask: (question: string) => Promise<string>
+    ): Promise<Player | undefined> {
+        Logger.info('TIE BREAKER!');
+        const tieBreakerQuestion = this.match.questionBuffer.pop();
+
+        if (!tieBreakerQuestion) {
+            Logger.warning(
+                'No tie-breaker questions available. The match is a draw.'
+            );
+            return undefined;
         }
 
-        return winner;
+        Logger.question(tieBreakerQuestion.text);
+
+        const player1Answer = await ask(
+            `${player1.name}, your answer: `
+        );
+        const player2Answer = await ask(
+            `${player2.name}, your answer: `
+        );
+
+        let p1Correct = false;
+        let p2Correct = false;
+
+        if (tieBreakerQuestion.type === 'boolean') {
+            p1Correct =
+                player1Answer.toLowerCase() ===
+                (
+                    tieBreakerQuestion as BooleanQuestion
+                ).correctAnswer.toString();
+            p2Correct =
+                player2Answer.toLowerCase() ===
+                (
+                    tieBreakerQuestion as BooleanQuestion
+                ).correctAnswer.toString();
+        } else if (tieBreakerQuestion.type === 'multiple') {
+            const correctAnswer = Array.from(
+                (tieBreakerQuestion as MultipleChoice).options.values()
+            ).find((o) => o.isCorrect)?.text;
+            p1Correct = player1Answer.toLowerCase() === correctAnswer?.toLowerCase();
+            p2Correct = player2Answer.toLowerCase() === correctAnswer?.toLowerCase();
+        }
+
+        if (p1Correct && !p2Correct) {
+            return player1;
+        }
+        if (!p1Correct && p2Correct) {
+            return player2;
+        }
+
+        return undefined; // Draw
     }
 }

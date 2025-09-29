@@ -1,11 +1,12 @@
+import { Match, Player } from './entities/index.ts';
 import { GameFlow } from './services/game-flow.service.ts';
 import { Logger } from './services/logger.service.ts';
-import yargs from 'yargs';
-import { hideBin } from 'yargs/helpers';
-import * as readline from 'readline';
-import { Match, Player, Question, type ID } from './entities/index.ts';
 import MatchService from './services/match.service.ts';
 import QuestionService from './services/questions.service.ts';
+import { displayHowToPlay } from './services/howToPlay.ts';
+import * as readline from 'readline';
+import yargs from 'yargs';
+import { hideBin } from 'yargs/helpers';
 import { Caretaker } from './entities/caretaker.ts';
 
 /**
@@ -169,6 +170,8 @@ class MainRunner {
     }
 
     public async run() {
+        displayHowToPlay();
+
         // Initial greeting & setup from args
         await this.setup();
 
@@ -207,6 +210,7 @@ class MainRunner {
                 break;
             }
 
+            Logger.info(`Difficulty: ${question.difficulty}`);
             await this.gameFlow.processQuestion(question, currentPlayer);
 
             this.matchCareTaker.backup();
@@ -217,14 +221,43 @@ class MainRunner {
 
         Logger.info('\nGame over!');
         const winner = this.matchService.determineWinner();
-        Logger.success('And the winner is...');
-        Logger.success('Get ready....');
-        Logger.success(
-            `${winner?.name} with ${winner?.points} points! Congratulations!`
-        );
-        Logger.info("There is not prize, but you're a winner in life!");
+
+        if (winner) {
+            Logger.success('And the winner is...');
+            Logger.success('Get ready....');
+            Logger.success(
+                `${winner.name} with ${winner.points} points! Congratulations!`
+            );
+            Logger.info("There is not prize, but you're a winner in life!");
+        } else {
+            Logger.info("It's a tie! There is no winner.");
+            const tiedPlayers = this.match.players.filter(
+                (p) => p.points === Math.max(...this.match.players.map((p) => p.points))
+            );
+            if (tiedPlayers.length > 1) {
+                const tieWinner = await this.matchService.handleTieBreaker(
+                    tiedPlayers[0]!,
+                    tiedPlayers[1]!,
+                    (q) => this.ask(q)
+                );
+                if (tieWinner) {
+                    Logger.success(
+                        `The winner of the tie-breaker is ${tieWinner.name}!`
+                    );
+                } else {
+                    Logger.info("It's a draw!");
+                }
+            } else {
+                Logger.info("It's a draw!");
+            }
+        }
+
+        this.rl.close();
     }
 }
 
 const main = new MainRunner();
-main.run();
+main.run().catch((err) => {
+    Logger.error('An unexpected error occurred: ' + err.message);
+    process.exit(1);
+});

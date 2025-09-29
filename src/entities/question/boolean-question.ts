@@ -25,13 +25,4 @@ export class BooleanQuestion extends Question {
     checkAnswer(candidate: boolean): boolean {
         return candidate === this.correctAnswer;
     }
-
-    toJSON() {
-        return {
-            ...super.toJSON(),
-            correctAnswer: this.correctAnswer,
-            labelTrue: this.labelTrue,
-            labelFalse: this.labelFalse
-        };
-    }
 }

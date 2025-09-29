@@ -18,14 +18,4 @@ export class Player extends User {
     addPoints(n: number) {
         this.points += n;
     }
-
-    toJSON() {
-        return {
-            ...super.toJSON(),
-            name: this.name,
-            points: this.points,
-            skips: this.skips,
-            roundsWins: this.roundsWins
-        };
-    }
 }

@@ -9,6 +9,7 @@ import {
 import MatchService from './match.service.ts';
 import { Logger } from './logger.service.ts';
 import { InvalidOperationError } from '../entities/Errors/errors.ts';
+import chalk from 'chalk';
 
 export class GameFlow {
     constructor(
@@ -94,7 +95,9 @@ export class GameFlow {
 
         while (userAnswer === undefined) {
             const userAnswerStr = await this.ask(
-                `${currentPlayer.name}, please enter true or false, or type 'skip': `
+                `${currentPlayer.name}, please enter ${chalk.green(
+                    'true'
+                )} or ${chalk.red('false')}, or type 'skip': `
             );
 
             if (userAnswerStr.toLowerCase() === 'skip') {
@@ -133,8 +136,6 @@ export class GameFlow {
             Logger.info(
                 `You used a skip. You have ${currentPlayer.skips} skips left.`
             );
-            // Manually advance to the next player
-            this.moveToNextPlayer({ turnOver: true } as any, currentPlayer);
         } catch (error: any) {
             if (error instanceof InvalidOperationError) {
                 Logger.warning(error.message);

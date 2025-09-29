@@ -25,10 +25,6 @@ export class Match {
         this.createdAt = new Date().toISOString();
     }
 
-    public addPlayer(player: Player) {
-        this.players.push(player);
-    }
-
     public hasPlayer(playerId: ID): boolean {
         return this.players.some((p) => p.id === playerId);
     }
@@ -74,23 +70,5 @@ export class Match {
         } else {
             this.currentPlayer = null;
         }
-    }
-
-    private getState() {
-        return {
-            id: this.id,
-            players: this.players,
-            questionPool: this.questionPool,
-            questionInPlay: this.questionInPlay,
-            assigned: this.assigned,
-            status: this.status,
-            passedQuestion: this.passedQuestion,
-            questionsResolved: this.questionsResolved,
-            numberOfRounds: this.numberOfRounds,
-            createdAt: this.createdAt,
-            currentRound: this.currentRound,
-            currentPlayer: this.currentPlayer,
-            questionBuffer: this.questionBuffer,
-        };
     }
 }

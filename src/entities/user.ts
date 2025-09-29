@@ -9,8 +9,4 @@ export class User {
         this.id = uuidv4();
         this.createdAt = new Date().toISOString();
     }
-
-    toJSON() {
-        return { id: this.id, createdAt: this.createdAt };
-    }
 }

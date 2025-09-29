@@ -63,16 +63,4 @@ export class Question {
             );
         this.answeredBy = by;
     }
-
-    toJSON() {
-        return {
-            id: this.id,
-            text: this.text,
-            category: this.category.toJSON(),
-            assignedTo: this.assignedTo,
-            answeredBy: this.answeredBy,
-            points: this.points,
-            createdAt: this.createdAt
-        };
-    }
 }
