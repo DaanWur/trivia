@@ -1,9 +1,7 @@
 import { Question } from './question.ts';
 
 export class BooleanQuestion extends Question {
-    // the canonical correct answer for this question
     correctAnswer: boolean;
-    // optional labels for the boolean choices
     labelTrue: string | undefined;
     labelFalse: string | undefined;
 

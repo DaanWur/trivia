@@ -1,11 +1,10 @@
-import type { ID } from './types.js';
 import { User } from './user.js';
 
 export class Player extends User {
     name: string;
-    points: number; // integer >= 0
-    skips: number; // integer >= 0, default 2
-    roundsWins: number; // integer >= 0
+    points: number;
+    skips: number;
+    roundsWins: number;
 
     constructor(name: string) {
         super();

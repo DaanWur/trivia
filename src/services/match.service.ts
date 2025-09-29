@@ -20,6 +20,10 @@ import { Logger } from './logger.service.ts';
 export default class MatchService {
     constructor(private match: Match) {}
 
+    /**
+     * Initializes the match service with a match instance.
+     * @param match - The match instance to be used by the service.
+     */
     public initialize(match: Match) {
         this.match = match;
     }
@@ -279,7 +283,6 @@ export default class MatchService {
             }
         }
 
-        // Should not be reached in a two-player game
         this.recordAnswer(playerId, false, q);
         return {
             pointsAwarded: 0,
@@ -324,7 +327,6 @@ export default class MatchService {
         this.match.assigned[playerId] = null;
         this.match.questionInPlay = null;
 
-        // try to mark question answered if possible
         try {
             if (q) q.markAnswered(playerId);
         } catch (e) {
@@ -395,13 +397,19 @@ export default class MatchService {
      */
     removePlayer(playerId: ID) {
         if (this.match.status === 'in-progress')
-            throw new InvalidOperationError('cannot remove player during match');
+            throw new InvalidOperationError(
+                'cannot remove player during match'
+            );
         const idx = this.match.players.findIndex((p) => p.id === playerId);
         if (idx === -1) throw new NotFoundError(`player ${playerId} not found`);
 
         this.match.players.splice(idx, 1);
     }
 
+    /**
+     * Determines the winner of the match based on the highest score.
+     * @returns The player with the highest score, or undefined if there is a tie or no players.
+     */
     determineWinner(): Player | undefined {
         if (this.match.players.length === 0) {
             return undefined;
@@ -422,6 +430,14 @@ export default class MatchService {
         return sortedPlayers[0];
     }
 
+    /**
+     * Handles the tie-breaking logic between two players.
+     * Asks each player a question and determines the winner based on their answers.
+     * @param player1 - The first player.
+     * @param player2 - The second player.
+     * @param ask - A function to prompt each player with the tie-breaker question.
+     * @returns The winning player, or undefined if it's a draw.
+     */
     async handleTieBreaker(
         player1: Player,
         player2: Player,
@@ -439,12 +455,8 @@ export default class MatchService {
 
         Logger.question(tieBreakerQuestion.text);
 
-        const player1Answer = await ask(
-            `${player1.name}, your answer: `
-        );
-        const player2Answer = await ask(
-            `${player2.name}, your answer: `
-        );
+        const player1Answer = await ask(`${player1.name}, your answer: `);
+        const player2Answer = await ask(`${player2.name}, your answer: `);
 
         let p1Correct = false;
         let p2Correct = false;
@@ -464,8 +476,10 @@ export default class MatchService {
             const correctAnswer = Array.from(
                 (tieBreakerQuestion as MultipleChoice).options.values()
             ).find((o) => o.isCorrect)?.text;
-            p1Correct = player1Answer.toLowerCase() === correctAnswer?.toLowerCase();
-            p2Correct = player2Answer.toLowerCase() === correctAnswer?.toLowerCase();
+            p1Correct =
+                player1Answer.toLowerCase() === correctAnswer?.toLowerCase();
+            p2Correct =
+                player2Answer.toLowerCase() === correctAnswer?.toLowerCase();
         }
 
         if (p1Correct && !p2Correct) {
