@@ -1,33 +1,43 @@
-import type { ID, MatchStatus } from './types.js';
-import { NotFoundError } from './Errors/errors.js';
-import { v4 as uuidv4 } from 'uuid';
+import { type MatchMemento } from '../interfaces/match-memento.ts';
 import { Player } from './player.ts';
-import type { MultipleChoice } from './question/multiple-choice.ts';
-import type { BooleanQuestion } from './question/boolean-question.ts';
-import type { MatchMemento } from '../interfaces/match-memento.ts';
+import { type Question } from './question/question.ts';
+import { type ID } from './types.ts';
 import { ConcreteMatchMemento } from './concrete-match-memento.ts';
 
 export class Match {
-    id: ID;
-    players: Player[];
-    numberOfRounds: number;
-    status: MatchStatus;
-    createdAt: string;
-    questionPool: Map<ID, MultipleChoice | BooleanQuestion>;
-    assigned: Record<ID, ID | null>;
-    currentPlayer: Player | null = null;
-    currentRound: number = 1;
-    passedQuestion: ID | null = null;
-    questionsResolved: number = 0;
+    public id: ID;
+    public players: Player[] = [];
+    public questionPool: Map<ID, Question> = new Map();
+    public questionBuffer: Question[] = [];
+    public assigned: Record<ID, ID | null> = {};
+    public status: 'waiting' | 'in-progress' | 'finished' = 'waiting';
+    public passedQuestion: ID | null = null;
+    public questionsResolved = 0;
+    public numberOfRounds: number;
+    public createdAt: string;
+    private currentPlayer: Player | null = null;
+    public currentRound = 1;
 
-    constructor(players: Player[] = [], numberOfRounds = 1) {
-        this.id = uuidv4();
-        this.players = players;
+    constructor(id?: ID) {
+        this.id = id ?? crypto.randomUUID();
         this.numberOfRounds = 0;
-        this.status = 'waiting';
         this.createdAt = new Date().toISOString();
-        this.questionPool = new Map();
-        this.assigned = {};
+    }
+
+    public addPlayer(player: Player) {
+        this.players.push(player);
+    }
+
+    public hasPlayer(playerId: ID): boolean {
+        return this.players.some((p) => p.id === playerId);
+    }
+
+    public setCurrentPlayer(player: Player) {
+        this.currentPlayer = player;
+    }
+
+    public getCurrentPlayer(): Player | null {
+        return this.currentPlayer;
     }
 
     save(): MatchMemento {
@@ -35,75 +45,49 @@ export class Match {
     }
 
     restore(memento: MatchMemento) {
-        const state = memento.getState();
-        if (!state.id) return;
-
-        this.id = state.id;
-        this.status = state.status!;
-        this.createdAt = state.createdAt!;
-        this.numberOfRounds = state.numberOfRounds!;
+        const state = memento.getState() as Match;
+        this.id = state.id!;
+        this.players = state.players!.map((pState: any) => {
+            const player = new Player(pState.name);
+            player.id = pState.id;
+            player.points = pState.points;
+            player.skips = pState.skips;
+            return player;
+        });
+        this.questionPool = state.questionPool!;
         this.assigned = state.assigned!;
-        this.questionPool = new Map(Object.entries(state.questionPool!));
-        this.currentRound = state.currentRound ?? 1;
-        this.passedQuestion = state.passedQuestion ?? null;
-        this.questionsResolved = state.questionsResolved ?? 0;
-
-        if (state.players) {
-            this.players = state.players.map((p) => {
-                const player = new Player(p.name);
-                player.id = p.id;
-                player.points = p.points;
-                player.skips = p.skips;
-                player.roundsWins = p.roundsWins;
-                return player;
-            });
-        }
-
-        if (state.currentPlayer) {
-            const p = state.currentPlayer;
+        this.status = state.status!;
+        this.passedQuestion = state.passedQuestion!;
+        this.questionsResolved = state.questionsResolved!;
+        this.numberOfRounds = state.numberOfRounds!;
+        this.createdAt = state.createdAt!;
+        this.currentRound = state.currentRound!;
+        if (state.getCurrentPlayer()) {
+            const p = state.getCurrentPlayer()!;
             const player = new Player(p.name);
             player.id = p.id;
             player.points = p.points;
             player.skips = p.skips;
-            player.roundsWins = p.roundsWins;
             this.currentPlayer = player;
         } else {
             this.currentPlayer = null;
         }
     }
 
-    hasPlayer(playerId: ID) {
-        return this.players.some((p) => p.id === playerId);
-    }
-
-    setCurrentPlayer(player: Player) {
-        const foundPlayer = this.players.find((p) => p.id === player.id);
-        if (!foundPlayer) {
-            throw new NotFoundError(
-                `Player with ID ${player.id} not found in match.`
-            );
-        }
-        this.currentPlayer = foundPlayer;
-    }
-
-    getCurrentPlayer(): Player | null {
-        return this.currentPlayer;
-    }
-
-    toJSON() {
+    private getState() {
         return {
             id: this.id,
-            players: this.players.map((p) =>
-                typeof p.toJSON === 'function' ? p.toJSON() : { id: p.id }
-            ),
-            numberOfRounds: this.numberOfRounds,
-            status: this.status,
-            createdAt: this.createdAt,
-            questionPool: Object.fromEntries(this.questionPool),
+            players: this.players,
+            questionPool: this.questionPool,
             assigned: this.assigned,
-            currentPlayer: this.currentPlayer,
+            status: this.status,
             passedQuestion: this.passedQuestion,
             questionsResolved: this.questionsResolved,
+            numberOfRounds: this.numberOfRounds,
+            createdAt: this.createdAt,
+            currentRound: this.currentRound,
+            currentPlayer: this.currentPlayer,
+            questionBuffer: this.questionBuffer,
         };
     }
 }

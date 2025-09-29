@@ -29,18 +29,28 @@ export default class MatchService {
      * Creates Question instances and stores them in match.questionPool keyed by id.
      * @param questions - array of ApiQuestion objects from the API
      */
-    createQuestionPool(questions: ApiQuestion[]) {
-        // The official number of rounds is the total questions minus the 4 skip-buffer questions
-        this.match.numberOfRounds = questions.length - 4;
+    createQuestionPool(
+        questions: ApiQuestion[],
+        numberOfGameQuestions: number
+    ) {
+        this.match.numberOfRounds = numberOfGameQuestions;
 
-        for (const questionData of questions) {
+        const gameQuestions = questions.slice(0, numberOfGameQuestions);
+        const bufferQuestions = questions.slice(numberOfGameQuestions);
+
+        for (const questionData of gameQuestions) {
             const newQuestion = this.createQuestionFromData(questionData);
             if (newQuestion) {
                 this.match.questionPool.set(newQuestion.id, newQuestion);
             }
         }
 
-        this.match.numberOfRounds = questions.length / 2;
+        for (const questionData of bufferQuestions) {
+            const newQuestion = this.createQuestionFromData(questionData);
+            if (newQuestion) {
+                this.match.questionBuffer.push(newQuestion);
+            }
+        }
     }
 
     private createQuestionFromData(
@@ -164,20 +174,41 @@ export default class MatchService {
     }
 
     /**
-     * Skip the player's current question (drop it) and assign the next
-     * available question to them.
+     * Skip the player's current question (drop it) and assign a new one
+     * from the buffer.
      * @param playerId - id of the player skipping their question
      * @returns the newly assigned Question or undefined if none available
      */
     skipQuestion(playerId: ID): Question | undefined {
-        if (!this.match.hasPlayer(playerId))
-            throw new NotFoundError(
-                `player ${playerId} not part of match ${this.match.id}`
-            );
-        const current = this.match.assigned[playerId];
-        // drop current
+        const player = this.match.players.find((p) => p.id === playerId);
+        if (!player) {
+            throw new NotFoundError(`Player with ID ${playerId} not found.`);
+        }
+
+        if (player.skips <= 0) {
+            throw new InvalidOperationError('Player has no skips left.');
+        }
+
+        player.skips--;
+
+        // Discard the current question
+        const currentQuestionId = this.match.assigned[playerId];
+        if (currentQuestionId) {
+            this.match.questionPool.delete(currentQuestionId);
+        }
         this.match.assigned[playerId] = null;
-        // assign next
+
+        // Draw a replacement from the buffer
+        const replacementQuestion = this.match.questionBuffer.pop();
+        if (replacementQuestion) {
+            this.match.questionPool.set(
+                replacementQuestion.id,
+                replacementQuestion
+            );
+            return this.assignQuestionToPlayer(playerId);
+        }
+
+        // If buffer is empty, just assign from the main pool
         return this.assignQuestionToPlayer(playerId);
     }
 

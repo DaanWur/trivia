@@ -88,7 +88,7 @@ class MainRunner {
         // Create players first
         const [firstPlayer, secondPlayer] = await this.createPlayers();
 
-        // Set the official number of rounds for the match
+        // The total number of questions to be answered in the match
         this.match.numberOfRounds = count;
 
         // Create the question pool
@@ -109,17 +109,17 @@ class MainRunner {
     private createQuestionPool = async (
         isUrl: boolean,
         filePath: string = 'data/questions-sample.json',
-        numberOfQuestions: number = 10,
+        numberOfGameQuestions: number = 10,
         difficulty?: string,
         questionType?: 'multiple' | 'boolean'
     ) => {
-        if (isNaN(numberOfQuestions) || numberOfQuestions <= 0) {
+        if (isNaN(numberOfGameQuestions) || numberOfGameQuestions <= 0) {
             Logger.error('Invalid number, please enter a positive integer.');
             return;
         }
         try {
             // Fetch 4 extra questions for the skip buffer
-            const totalQuestionsToFetch = numberOfQuestions + 4;
+            const totalQuestionsToFetch = numberOfGameQuestions + 4;
 
             const questions = isUrl
                 ? await this.questionService.getQuestionsFromApi(
@@ -130,7 +130,10 @@ class MainRunner {
                 : await this.questionService.readQuestionsFromJson(filePath);
 
             if (this.matchService)
-                this.matchService.createQuestionPool(questions);
+                this.matchService.createQuestionPool(
+                    questions,
+                    numberOfGameQuestions
+                );
         } catch (error) {
             Logger.error(
                 `Failed to load questions. Please check your connection or file path.`

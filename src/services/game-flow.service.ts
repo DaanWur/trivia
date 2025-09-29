@@ -8,6 +8,7 @@ import {
 } from '../entities/index.ts';
 import MatchService from './match.service.ts';
 import { Logger } from './logger.service.ts';
+import { InvalidOperationError } from '../entities/Errors/errors.ts';
 
 export class GameFlow {
     constructor(
@@ -70,18 +71,18 @@ export class GameFlow {
     }
 
     private skipFlow(currentPlayer: Player, currentQuestion: Question) {
-        currentPlayer.skips--;
-        // Discard the current question
-        this.matchService.recordAnswer(
-            currentPlayer.id,
-            false,
-            currentQuestion
-        );
-        // Immediately assign a new question from the main pool
-        this.matchService.assignQuestionToPlayer(currentPlayer.id);
-        Logger.info(
-            `You used a skip. You have ${currentPlayer.skips} skips left.`
-        );
+        try {
+            this.matchService.skipQuestion(currentPlayer.id);
+            Logger.info(
+                `You used a skip. You have ${currentPlayer.skips} skips left.`
+            );
+        } catch (error: any) {
+            if (error instanceof InvalidOperationError) {
+                Logger.warning(error.message);
+            } else {
+                Logger.error('An unexpected error occurred during skip.');
+            }
+        }
     }
 
     private async multipleQuestionFlow(
