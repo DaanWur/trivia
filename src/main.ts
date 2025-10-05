@@ -1,14 +1,14 @@
 #!/usr/bin/env node
-import { Match, Player } from './entities/index.ts';
-import { GameFlow } from './services/game-flow.service.ts';
-import { Logger } from './services/logger.service.ts';
-import MatchService from './services/match.service.ts';
-import QuestionService from './services/questions.service.ts';
-import { displayHowToPlay } from './services/howToPlay.ts';
 import * as readline from 'readline';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { Caretaker } from './entities/caretaker.ts';
+import { Match, Player } from './entities/index.ts';
+import { GameFlow } from './services/game-flow.service.ts';
+import { displayHowToPlay } from './services/howToPlay.ts';
+import { Logger } from './services/logger.service.ts';
+import MatchService from './services/match.service.ts';
+import QuestionService from './services/questions.service.ts';
 
 /**
  * MainRunner manages CLI state for a single run of the Trivia app.
@@ -22,8 +22,8 @@ class MainRunner {
     private questionService: QuestionService;
     private matchCareTaker: Caretaker;
     private gameFlow: GameFlow;
-    private isUrl = false;
-    private isexit = false;
+    private isUrl = false; // CR: not used
+    private isexit = false; // CR: not used. And not according to any naming convention (should be isExit)
     private firstTurn = true;
 
     constructor() {
@@ -41,6 +41,7 @@ class MainRunner {
     }
 
     private async setup() {
+        // CR: the parsing should be done in it's own function
         const argv = await yargs(hideBin(process.argv))
             .option('count', {
                 alias: 'c',
@@ -57,7 +58,7 @@ class MainRunner {
                 alias: 'u',
                 type: 'boolean',
                 description: 'Fetch questions from the Open Trivia DB API'
-            })
+            }) // CR: what happens if the user provides both file and url? use 'conflicts' - https://yargs.js.org/docs/#api-reference-conflictsx-y
             .option('difficulty', {
                 alias: 'd',
                 type: 'string',
@@ -87,7 +88,7 @@ class MainRunner {
             | 'boolean'
             | undefined;
 
-        // Create players first
+        // Create players first // CR: redundant comment. And you are not using the secondPlayer variable in this function. you could have written ...
         const [firstPlayer, secondPlayer] = await this.createPlayers();
 
         // The total number of questions to be answered in the match
@@ -170,6 +171,7 @@ class MainRunner {
         return [firstPlayer, secondPlayer];
     }
 
+    // CR: this function is way too long. Break it into smaller functions
     public async run() {
         displayHowToPlay();
 
@@ -201,9 +203,8 @@ class MainRunner {
             Logger.turn(`-------- Round ${this.match.currentRound} --------`);
             Logger.turn(`${currentPlayer.name}'s turn.`);
 
-            const question = await this.gameFlow.getQuestionForPlayer(
-                currentPlayer
-            );
+            const question =
+                await this.gameFlow.getQuestionForPlayer(currentPlayer);
 
             if (!question) {
                 Logger.warning('No more questions available. Ending game.');
@@ -233,7 +234,9 @@ class MainRunner {
         } else {
             Logger.info("It's a tie! There is no winner.");
             const tiedPlayers = this.match.players.filter(
-                (p) => p.points === Math.max(...this.match.players.map((p) => p.points))
+                (p) =>
+                    p.points ===
+                    Math.max(...this.match.players.map((p) => p.points))
             );
             if (tiedPlayers.length > 1) {
                 const tieWinner = await this.matchService.handleTieBreaker(

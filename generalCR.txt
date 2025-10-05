@@ -1,0 +1,6 @@
+1. This is waaaaaaay over engineered
+2. will you be ready to learn some heavy lifting in python?
+    we are not using JS/TS as a OOP language. We do use python as such (most of the time)
+3. The whole CareTaker thing - what is this for? This was not required
+4. The various files in the "types" folder should be combined into a single file
+5. Why separate boolean and multiple answear question?

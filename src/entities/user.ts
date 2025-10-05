@@ -1,6 +1,7 @@
-import type { ID } from './types.js';
 import { v4 as uuidv4 } from 'uuid';
+import type { ID } from './types.js';
 
+// CR: why is this needed?
 export class User {
     id: ID;
     createdAt: string;

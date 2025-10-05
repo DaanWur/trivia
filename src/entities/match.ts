@@ -1,8 +1,10 @@
 import { type MatchMemento } from '../interfaces/match-memento.ts';
+import { ConcreteMatchMemento } from './concrete-match-memento.ts';
 import { Player } from './player.ts';
 import { type Question } from './question/question.ts';
 import { type ID } from './types.ts';
-import { ConcreteMatchMemento } from './concrete-match-memento.ts';
+
+// CR: this class is not needed. at least not all of it. Most if it is redundant
 
 export class Match {
     public id: ID;

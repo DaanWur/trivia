@@ -1,3 +1,5 @@
+import chalk from 'chalk';
+import { InvalidOperationError } from '../entities/Errors/errors.ts';
 import {
     BooleanQuestion,
     Match,
@@ -6,10 +8,8 @@ import {
     Question,
     type ID
 } from '../entities/index.ts';
-import MatchService from './match.service.ts';
 import { Logger } from './logger.service.ts';
-import { InvalidOperationError } from '../entities/Errors/errors.ts';
-import chalk from 'chalk';
+import MatchService from './match.service.ts';
 
 export class GameFlow {
     constructor(
@@ -74,7 +74,9 @@ export class GameFlow {
         categories.forEach((c, i) => Logger.info(`${i + 1}: ${c}`));
 
         while (true) {
-            const choiceStr = await this.ask('Enter the number of your choice: ');
+            const choiceStr = await this.ask(
+                'Enter the number of your choice: '
+            );
             const choice = parseInt(choiceStr) - 1;
             if (choice >= 0 && choice < categories.length) {
                 return categories[choice]!;
@@ -231,6 +233,7 @@ export class GameFlow {
                 `Correct! You earned ${turnResult.pointsAwarded} points.`
             );
         } else if (turnResult.questionPassed) {
+            // CR: this is not clear enough. need to change it to "wrong. The question..."
             Logger.info(`The question has been passed to the next player.`);
         } else {
             Logger.error('Wrong answer!');

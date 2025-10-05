@@ -4,7 +4,7 @@ export class Player extends User {
     name: string;
     points: number;
     skips: number;
-    roundsWins: number;
+    roundsWins: number; // CR: why do you need this?
 
     constructor(name: string) {
         super();

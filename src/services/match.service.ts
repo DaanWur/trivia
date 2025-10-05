@@ -1,7 +1,8 @@
+import { decodeHTML } from 'entities';
 import {
-    NotFoundError,
+    DuplicateError,
     InvalidOperationError,
-    DuplicateError
+    NotFoundError
 } from '../entities/Errors/errors.ts';
 import {
     BooleanQuestion,
@@ -14,7 +15,6 @@ import {
 import type { ApiQuestion } from '../types/api-question.ts';
 import type { ChosenAnswer } from '../types/chosen-answer.ts';
 import type Answer from '../types/multiple-choice-answer.ts';
-import { decodeHTML } from 'entities';
 import { Logger } from './logger.service.ts';
 
 export default class MatchService {
@@ -34,6 +34,7 @@ export default class MatchService {
      * @param questions - array of ApiQuestion objects from the API
      */
     createQuestionPool(
+        // CR: there are 2 functions called createQuestionPool. Why do you need to spread this logic?
         questions: ApiQuestion[],
         numberOfGameQuestions: number
     ) {

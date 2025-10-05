@@ -1,5 +1,7 @@
-import type { ID } from './types.js';
 import { v4 as uuidv4 } from 'uuid';
+import type { ID } from './types.js';
+
+// CR: I think this file too is over engineered for what it does. Why do I need the ids etc?
 
 export class Category {
     id: ID;
